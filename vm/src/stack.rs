@@ -127,6 +127,59 @@ impl Stack {
             current_frame: None,
         }
     }
+
+    /// Moves a value to the top of the stack.
+    /// 
+    /// This method removes the value from its current position and pushes it to the top of the stack.
+    pub fn move_to_top(&mut self, value: StackValue) {
+        let index = self.values.iter().position(|v| v == &value).expect("Value not found in stack");
+        self.values.remove(index);
+        self.values.push(value);
+    }
+
+    /// Copies a value to the top of the stack.
+    /// 
+    /// This method inserts a copy of the value at the top of the stack.
+    pub fn copy_to_top(&mut self, value: StackValue) {
+        let value = self.values.iter().find(|v| **v == value).expect("Value not found in stack");
+        self.values.push(value.clone());           
+    }
+
+    /// Copies the nth value from the top of the stack to the top of the stack.
+    /// 
+    /// This method inserts a copy of the nth value from the top of the stack to the top of the stack.
+    /// The index is 0-based from the end of the stack, so n=0 refers to the top element,
+    /// n=1 refers to the element below the top, and so on.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `n` - The 0-based index from the top of the stack (n=0 is the top element).
+    /// 
+    /// # Panics
+    /// 
+    /// This method will panic if the index is out of bounds.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// # use vm::stack::{Stack, StackValue};
+    /// # let mut stack = Stack::new(10);
+    /// # stack.push(StackValue::Integer(1));
+    /// # stack.push(StackValue::Integer(2));
+    /// # stack.push(StackValue::Integer(3));
+    /// // Stack is now [1, 2, 3] with 3 at the top
+    /// stack.copy_nth_to_top(1); // Copies value at index 1 (which is 2) to the top
+    /// // Stack is now [1, 2, 3, 2]
+    /// ```
+    pub fn copy_nth_to_top(&mut self, n: usize) {
+        if n >= self.len() {
+            panic!("Stack index out of bounds");
+        }
+        
+        let index = self.len() - 1 - n;
+        let value = self.values[index].clone();
+        self.values.push(value);
+    }
     
     /// Pushes a value onto the stack.
     pub fn push(&mut self, value: StackValue) {
@@ -361,5 +414,56 @@ mod tests {
         let return_addr = stack.pop_frame();
         assert_eq!(return_addr, Some(100));
         assert_eq!(stack.frame_depth(), 0);
+    }
+
+    #[test]
+    fn test_move_to_top() {
+        let mut stack = Stack::new(10);
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Integer(2));
+        
+        stack.move_to_top(StackValue::Integer(2));
+        assert_eq!(stack.peek(), Some(&StackValue::Integer(2)));
+
+        stack.move_to_top(StackValue::Integer(1));
+        assert_eq!(stack.peek(), Some(&StackValue::Integer(1)));
+    }
+
+    #[test]
+    fn test_copy_to_top() {
+        let mut stack = Stack::new(10);
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Integer(2));
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.peek(), Some(&StackValue::Integer(2)));
+
+        stack.copy_to_top(StackValue::Integer(1));
+        assert_eq!(stack.peek(), Some(&StackValue::Integer(1)));
+        assert_eq!(stack.len(), 3);
+
+        stack.copy_to_top(StackValue::Integer(2));
+        assert_eq!(stack.peek(), Some(&StackValue::Integer(2)));
+        assert_eq!(stack.len(), 4);
+    }
+
+    #[test]
+    fn test_copy_nth_to_top() {
+        let mut stack = Stack::new(10);
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Integer(2));
+        stack.push(StackValue::Integer(3));
+        // Stack now has [1, 2, 3] with 3 at the top
+
+        // Copy the value at position 1 (which is 2) to the top
+        stack.copy_nth_to_top(1);
+        assert_eq!(stack.peek(), Some(&StackValue::Integer(2)));
+        assert_eq!(stack.len(), 4);
+        // Stack now has [1, 2, 3, 2]
+
+        // When the stack is [1, 2, 3, 2], position 2 is element 1
+        stack.copy_nth_to_top(2);
+        assert_eq!(stack.peek(), Some(&StackValue::Integer(2)));
+        assert_eq!(stack.len(), 5);
+        // Stack now has [1, 2, 3, 2, 2]
     }
 } 
