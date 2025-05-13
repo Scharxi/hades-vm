@@ -1,23 +1,79 @@
 use std::{collections::VecDeque, io::{stdout, Stdout, Write}};
 
-use crate::{instruction::{Instruction, RawInstruction}, opcode::Opcode, memory::Memory};
+use crate::{instruction::{Instruction, RawInstruction}, memory::{MemoryRegionType, SegmentedMemory}, opcode::Opcode};
 
 pub struct CPU {
     fetcher: InstructionFetcher, 
     decoder: InstructionDecoder, 
     executor: InstructionExecutor,
     stack: VecDeque<i32>,
-    memory: Memory, 
+    memory: SegmentedMemory, 
 }
 
 impl CPU {
-    pub fn new() -> Self {
+    pub fn new(memory_size: usize) -> Self {
+        #[cfg(test)]
+        let memory = match SegmentedMemory::create_test_layout(memory_size) {
+            Ok(mem) => mem,
+            Err(e) => {
+                // Fallback: Erstelle einen Speicher ohne Regionen für Tests
+                let mut mem = SegmentedMemory::new(memory_size);
+                
+                // Erstelle eine einzige Region für den gesamten Speicher mit allen Berechtigungen
+                let all_region = crate::memory::MemoryRegion::new(
+                    MemoryRegionType::Data,
+                    0,
+                    memory_size,
+                    vec![
+                        crate::memory::AccessPermission::Read,
+                        crate::memory::AccessPermission::Write,
+                        crate::memory::AccessPermission::Execute,
+                    ],
+                    Some("All Memory".to_string()),
+                );
+                
+                if let Err(e2) = mem.define_region(all_region) {
+                    panic!("Failed to create memory: {} and fallback failed: {}", e, e2);
+                }
+                
+                mem
+            }
+        };
+        
+        #[cfg(not(test))]
+        let memory = match SegmentedMemory::create_standard_layout(memory_size) {
+            Ok(mem) => mem,
+            Err(e) => {
+                // Fallback: Erstelle einen Speicher ohne Regionen für Tests
+                let mut mem = SegmentedMemory::new(memory_size);
+                
+                // Erstelle eine einzige Region für den gesamten Speicher mit allen Berechtigungen
+                let all_region = crate::memory::MemoryRegion::new(
+                    MemoryRegionType::Data,
+                    0,
+                    memory_size,
+                    vec![
+                        crate::memory::AccessPermission::Read,
+                        crate::memory::AccessPermission::Write,
+                        crate::memory::AccessPermission::Execute,
+                    ],
+                    Some("All Memory".to_string()),
+                );
+                
+                if let Err(e2) = mem.define_region(all_region) {
+                    panic!("Failed to create memory: {} and fallback failed: {}", e, e2);
+                }
+                
+                mem
+            }
+        };
+        
         Self {
             fetcher: InstructionFetcher::new(),
             decoder: InstructionDecoder,
             executor: InstructionExecutor::new(),
             stack: VecDeque::new(),
-            memory: Memory::new(1024),
+            memory,
         }
     }
 
@@ -152,7 +208,7 @@ impl InstructionExecutor {
     }
 
     // Return Some(address) if a jump should occur, otherwise None
-    pub fn execute(&mut self, instruction: &Instruction, stack: &mut VecDeque<i32>, memory: &mut Memory) -> Option<usize> {
+    pub fn execute(&mut self, instruction: &Instruction, stack: &mut VecDeque<i32>, memory: &mut SegmentedMemory) -> Option<usize> {
         match instruction.opcode {
             Opcode::Add => {
                         if instruction.opcode.operand_count() > 0 {
@@ -242,7 +298,7 @@ impl InstructionExecutor {
                         }
 
                         let address = instruction.operands[0] as usize;
-                        match memory.load(address) {
+                        match memory.read(address) {
                             Ok(value) => stack.push_back(value),
                             Err(e) => panic!("Memory error: {}", e),
                         }
@@ -256,7 +312,7 @@ impl InstructionExecutor {
                         let address = instruction.operands[0] as usize;
                         let value = stack.pop_back().expect("Stack underflow");
                 
-                        match memory.store(address, value) {
+                        match memory.write(address, value) {
                             Ok(_) => {},
                             Err(e) => panic!("Memory error: {}", e),
                         }
@@ -301,7 +357,52 @@ impl InstructionExecutor {
                 }
 
                 None
-            }
+            },
+            // Neue Opcodes, die mit Speicherregionen arbeiten
+            Opcode::LoadFromRegion => {
+                let region_id = instruction.operands[0] as usize;
+                let offset = instruction.operands[1] as usize;
+                
+                // Region-ID in RegionType umwandeln
+                let region_type = match region_id {
+                    0 => MemoryRegionType::Code,
+                    1 => MemoryRegionType::Data,
+                    2 => MemoryRegionType::Stack,
+                    3 => MemoryRegionType::Heap,
+                    4 => MemoryRegionType::Constants,
+                    5 => MemoryRegionType::IO,
+                    _ => return None,
+                };
+                
+                let value = memory.read_from_region(region_type, offset);
+                match value {
+                    Ok(value) => stack.push_back(value),
+                    Err(e) => panic!("Memory error: {}", e),
+                }
+                None
+            },
+            
+            Opcode::StoreToRegion => {
+                let region_id = instruction.operands[0] as usize;
+                let offset = instruction.operands[1] as usize;
+                let value = stack.pop_back().unwrap_or(0);
+                
+                // Region-ID in RegionType umwandeln
+                let region_type = match region_id {
+                    0 => MemoryRegionType::Code,
+                    1 => MemoryRegionType::Data,
+                    2 => MemoryRegionType::Stack,
+                    3 => MemoryRegionType::Heap,
+                    4 => MemoryRegionType::Constants,
+                    5 => MemoryRegionType::IO,
+                    _ => return None,
+                };
+                
+                match memory.write_to_region(region_type, offset, value) {
+                    Ok(_) => None,
+                    Err(e) => panic!("Memory error: {}", e),
+                }
+            },
         }
     }
 }
@@ -312,7 +413,12 @@ pub struct VirtualMachine {
 
 impl VirtualMachine {
     pub fn new() -> Self {
-        Self { cpu: CPU::new() }
+        Self { cpu: CPU::new(10000) }
+    }
+
+    // Konstruktor mit angegebener Speichergröße
+    pub fn with_memory_size(size: usize) -> Self {
+        Self { cpu: CPU::new(size) }
     }
 
     pub fn run(&mut self) -> bool {
