@@ -13,6 +13,10 @@ pub enum Opcode {
     Divide = 0xA,
     LoadFromRegion = 0xB,
     StoreToRegion = 0xC,
+    Call = 0xD,
+    Return = 0xE,
+    LoadLocal = 0xF,
+    StoreLocal = 0x10,
 }
 
 impl Opcode {
@@ -30,6 +34,10 @@ impl Opcode {
             Opcode::LoadMemory => 1,
             Opcode::StoreMemory => 1,
             Opcode::JumpIfZero => 1,
+            Opcode::Call => 2,
+            Opcode::Return => 0,
+            Opcode::LoadLocal => 1,
+            Opcode::StoreLocal => 1,
         }
     }
 }
@@ -74,6 +82,10 @@ impl OpcodeMapping for Opcode {
             "Divide" => Some(Opcode::Divide as u8),
             "LoadFromRegion" => Some(Opcode::LoadFromRegion as u8),
             "StoreToRegion" => Some(Opcode::StoreToRegion as u8),
+            "Call" => Some(Opcode::Call as u8),
+            "Return" => Some(Opcode::Return as u8),
+            "LoadLocal" => Some(Opcode::LoadLocal as u8),
+            "StoreLocal" => Some(Opcode::StoreLocal as u8),
             _ => None,
         }
     }
