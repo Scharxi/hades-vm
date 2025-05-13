@@ -1,10 +1,20 @@
 [package]
 name = "hades-vm"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[workspace]
+members = [
+    "vm",
+    "intoraw-derive"
+]
 
 [lib]
 name = "vm"
 path = "vm/src/lib.rs"
 
 [dependencies]
+intoraw-derive = { path = "intoraw-derive", optional = true }
+
+[features]
+derive = ["intoraw-derive"]

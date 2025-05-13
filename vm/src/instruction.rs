@@ -1,5 +1,7 @@
 use crate::opcode::Opcode;
-
+// Import the derive macro
+#[cfg(feature = "derive")]
+pub use intoraw_derive::IntoRaw;
 
 #[derive(Debug, Clone)]
 pub struct Instruction {
@@ -32,12 +34,9 @@ impl RawInstruction {
 
     pub fn get_operands(&self) -> Vec<i32> {
         let mut operands = Vec::new();
-        let mut value = self.0 >> 8;
-        for _ in 0..self.operand_count() {
-            operands.push(value & 0xffffff);
-            value >>= 24;
+        if self.has_operands() {
+            operands.push(self.operand());
         }
-        operands.reverse();
         operands
     }
 
@@ -52,7 +51,6 @@ impl RawInstruction {
     pub fn operand_count(&self) -> usize {
         self.opcode().operand_count()
     }
-
 }
 
 impl From<RawInstruction> for Instruction {
@@ -63,45 +61,114 @@ impl From<RawInstruction> for Instruction {
     }
 }
 
-
+/// This trait allows instruction types to be converted to RawInstruction
 pub trait IntoRaw {
     fn into_raw(self) -> RawInstruction;
 }
 
+// Define instruction types with manual implementations
+pub struct Add;
 
-
-mod instructions {
-    use super::{IntoRaw, RawInstruction};
-
-    pub struct Store(pub i32);
-
-    impl IntoRaw for Store {
-        fn into_raw(self) -> RawInstruction {
-            // Extract individual bytes from the operand value
-            let operand = self.0;
-            let b0 = ((operand >> 16) & 0xFF) as u8;
-            let b1 = ((operand >> 8) & 0xFF) as u8;
-            let b2 = (operand & 0xFF) as u8;
-            
-            // Create instruction with opcode 0x02 (Store)
-            RawInstruction::from_bytes(b0, b1, b2, 0x02)
-        }
+impl IntoRaw for Add {
+    fn into_raw(self) -> RawInstruction {
+        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x01)
     }
+}
 
-    pub struct Add; 
+pub struct Store(pub i32);
 
-    impl IntoRaw for Add {
-        fn into_raw(self) -> RawInstruction {
-            RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x01)
-        }
+impl IntoRaw for Store {
+    fn into_raw(self) -> RawInstruction {
+        // Extract the operand from the first field
+        let operand = self.0;
+        let b0 = ((operand >> 16) & 0xFF) as u8;
+        let b1 = ((operand >> 8) & 0xFF) as u8;
+        let b2 = (operand & 0xFF) as u8;
+        
+        // Create instruction with the appropriate opcode
+        RawInstruction::from_bytes(b0, b1, b2, 0x02)
+    }
+}
+
+pub struct Sub;
+
+impl IntoRaw for Sub {
+    fn into_raw(self) -> RawInstruction {
+        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x03)
+    }
+}
+
+pub struct LoadConstant(pub i32);
+
+impl IntoRaw for LoadConstant {
+    fn into_raw(self) -> RawInstruction {
+        let operand = self.0;
+        let b0 = ((operand >> 16) & 0xFF) as u8;
+        let b1 = ((operand >> 8) & 0xFF) as u8;
+        let b2 = (operand & 0xFF) as u8;
+        
+        RawInstruction::from_bytes(b0, b1, b2, 0x04)
+    }
+}
+
+pub struct Multiply;
+
+impl IntoRaw for Multiply {
+    fn into_raw(self) -> RawInstruction {
+        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x05)
+    }
+}
+
+pub struct Print;
+
+impl IntoRaw for Print {
+    fn into_raw(self) -> RawInstruction {
+        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x06)
+    }
+}
+
+pub struct LoadMemory(pub i32);
+
+impl IntoRaw for LoadMemory {
+    fn into_raw(self) -> RawInstruction {
+        let operand = self.0;
+        let b0 = ((operand >> 16) & 0xFF) as u8;
+        let b1 = ((operand >> 8) & 0xFF) as u8;
+        let b2 = (operand & 0xFF) as u8;
+        
+        RawInstruction::from_bytes(b0, b1, b2, 0x07)
+    }
+}
+
+pub struct StoreMemory(pub i32);
+
+impl IntoRaw for StoreMemory {
+    fn into_raw(self) -> RawInstruction {
+        let operand = self.0;
+        let b0 = ((operand >> 16) & 0xFF) as u8;
+        let b1 = ((operand >> 8) & 0xFF) as u8;
+        let b2 = (operand & 0xFF) as u8;
+        
+        RawInstruction::from_bytes(b0, b1, b2, 0x08)
+    }
+}
+
+pub struct JumpIfZero(pub i32);
+
+impl IntoRaw for JumpIfZero {
+    fn into_raw(self) -> RawInstruction {
+        let operand = self.0;
+        let b0 = ((operand >> 16) & 0xFF) as u8;
+        let b1 = ((operand >> 8) & 0xFF) as u8;
+        let b2 = (operand & 0xFF) as u8;
+        
+        RawInstruction::from_bytes(b0, b1, b2, 0x09)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::instruction::instructions::Store;
-
-    use super::{instructions::Add, *};
+    use super::*;
 
     #[test]
     fn test_raw_instruction() {
@@ -122,19 +189,102 @@ mod tests {
     }
 
     #[test]
-    fn test_instructions_into_raw_instruction() {
-        let instruction: Store = Store(0x010203);
-        let raw: RawInstruction = instruction.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Store);
-        assert_eq!(raw.operand(), 0x010203); 
-    }
-
-    #[test]
-    fn test_instructions_into_raw_instruction_add() {
-        let instruction: Add = Add;
-        let raw: RawInstruction = instruction.into_raw();
+    fn test_into_raw() {
+        // Test Add instruction (no operands)
+        let add = Add;
+        let raw = add.into_raw();
         assert_eq!(raw.opcode(), Opcode::Add);
-        assert_eq!(raw.operand(), 0x000000);
+        assert!(!raw.has_operands());
+        
+        // Test Store instruction with operand
+        let store = Store(42);
+        let raw = store.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.operand(), 42);
+        assert!(raw.has_operands());
+    }
+}
+
+// Example of using the derive macro when feature is enabled
+#[cfg(feature = "derive")]
+mod derive_tests {
+    use super::*;
+    
+    // Types using the derive macro
+    #[derive(IntoRaw)]
+    #[opcode = "1"] // Must be literal values, not identifiers
+    struct CustomAdd;
+    
+    #[derive(IntoRaw)]
+    #[opcode = "2"]
+    struct CustomStore(i32);
+    
+    // Example for custom opcode specification with attribute
+    #[derive(IntoRaw)]
+    #[opcode = "3"] // Sub opcode
+    struct CustomSub;
+    
+    #[derive(IntoRaw)]
+    #[opcode = "4"] // LoadConstant opcode with operand
+    struct CustomLoadConstant(i32);
+    
+    #[derive(IntoRaw)]
+    #[opcode = "5"] // Multiply opcode
+    struct CustomMultiply;
+    
+    #[derive(IntoRaw)]
+    #[opcode = "6"] // Print opcode
+    struct CustomPrint;
+    
+    #[derive(IntoRaw)]
+    #[opcode = "7"] // LoadMemory opcode with operand
+    struct CustomLoadMemory(i32);
+    
+    #[derive(IntoRaw)]
+    #[opcode = "8"] // StoreMemory opcode with operand
+    struct CustomStoreMemory(i32);
+    
+    #[test]
+    fn test_derive_macro() {
+        // Test derived Add instruction
+        let add = CustomAdd;
+        let raw = add.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Add);
+        
+        // Test derived Store instruction
+        let store = CustomStore(123);
+        let raw = store.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.operand(), 123);
+        
+        // Test custom opcodes with attributes
+        let sub = CustomSub;
+        let raw = sub.into_raw();
+        assert_eq!(raw.as_i32() & 0xFF, 3); // Check raw opcode
+        
+        let load = CustomLoadConstant(42);
+        let raw = load.into_raw();
+        assert_eq!(raw.as_i32() & 0xFF, 4); // Check raw opcode
+        assert_eq!(raw.operand(), 42);      // Check operand
+        
+        // Test new custom opcodes
+        let multiply = CustomMultiply;
+        let raw = multiply.into_raw();
+        assert_eq!(raw.as_i32() & 0xFF, 5);
+        
+        let print = CustomPrint;
+        let raw = print.into_raw();
+        assert_eq!(raw.as_i32() & 0xFF, 6);
+        
+        let load_mem = CustomLoadMemory(100);
+        let raw = load_mem.into_raw();
+        assert_eq!(raw.as_i32() & 0xFF, 7);
+        assert_eq!(raw.operand(), 100);
+        
+        let store_mem = CustomStoreMemory(200);
+        let raw = store_mem.into_raw();
+        assert_eq!(raw.as_i32() & 0xFF, 8);
+        assert_eq!(raw.operand(), 200);
     }
 }
 

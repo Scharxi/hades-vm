@@ -3,6 +3,13 @@
 pub enum Opcode {
     Add = 0x1,
     Store = 0x2, 
+    Sub = 0x3,
+    LoadConstant = 0x4,
+    Multiply = 0x5,
+    Print = 0x6,
+    LoadMemory = 0x7,
+    StoreMemory = 0x8,
+    JumpIfZero = 0x9,
 }
 
 impl Opcode {
@@ -10,6 +17,13 @@ impl Opcode {
         match self {
             Opcode::Add => 0,
             Opcode::Store => 1, 
+            Opcode::Sub => 0,
+            Opcode::LoadConstant => 1,
+            Opcode::Multiply => 0,
+            Opcode::Print => 0,
+            Opcode::LoadMemory => 1,
+            Opcode::StoreMemory => 1,
+            Opcode::JumpIfZero => 1,
         }
     }
 }

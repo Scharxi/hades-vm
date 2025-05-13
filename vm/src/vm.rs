@@ -1,13 +1,13 @@
-use std::{collections::VecDeque, io::{stdout, Stdout}};
+use std::{collections::VecDeque, io::{stdout, Stdout, Write}};
 
-use crate::{instruction::{Instruction, RawInstruction}, opcode::Opcode};
+use crate::{instruction::{Instruction, RawInstruction}, opcode::Opcode, memory::Memory};
 
 pub struct CPU {
     fetcher: InstructionFetcher, 
     decoder: InstructionDecoder, 
     executor: InstructionExecutor,
     stack: VecDeque<i32>,
-    // memory: Memory, 
+    memory: Memory, 
 }
 
 impl CPU {
@@ -17,6 +17,7 @@ impl CPU {
             decoder: InstructionDecoder,
             executor: InstructionExecutor::new(),
             stack: VecDeque::new(),
+            memory: Memory::new(1024),
         }
     }
 
@@ -24,10 +25,19 @@ impl CPU {
         self.fetcher.load_program(program);
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> bool {
         if let Some(instruction_raw) = self.fetcher.fetch() {
             let instruction = self.decoder.decode(instruction_raw);
-            self.executor.execute(&instruction, &mut self.stack);
+            let jump_address = self.executor.execute(&instruction, &mut self.stack, &mut self.memory);
+            
+            // Handle jump instructions
+            if let Some(address) = jump_address {
+                self.fetcher.set_pc(address);
+            }
+            
+            true
+        } else {
+            false
         }
     }
 }
@@ -37,6 +47,14 @@ pub struct ALU;
 impl ALU {
     pub fn add(&self, a: i32, b: i32) -> i32 {
         a + b
+    }
+    
+    pub fn sub(&self, a: i32, b: i32) -> i32 {
+        a - b
+    }
+    
+    pub fn multiply(&self, a: i32, b: i32) -> i32 {
+        a * b
     }
 }
 
@@ -88,6 +106,16 @@ impl InstructionFetcher {
             None
         }
     }
+    
+    pub fn set_pc(&mut self, address: usize) {
+        if address % 4 != 0 {
+            panic!("Program counter must be aligned to 4 bytes");
+        }
+        if address >= self.program.len() {
+            panic!("Program counter out of bounds");
+        }
+        self.pc = address;
+    }
 }
 
 
@@ -107,15 +135,20 @@ impl InstructionDecoder {
 
 pub struct InstructionExecutor { 
     alu: ALU, 
+    output: Stdout,
 }
 
 impl InstructionExecutor {
 
     pub fn new() -> Self {
-        Self { alu: ALU }
+        Self { 
+            alu: ALU,
+            output: stdout()
+        }
     }
 
-    pub fn execute(&mut self, instruction: &Instruction,  stack: &mut VecDeque<i32>,) {
+    // Return Some(address) if a jump should occur, otherwise None
+    pub fn execute(&mut self, instruction: &Instruction, stack: &mut VecDeque<i32>, memory: &mut Memory) -> Option<usize> {
         match instruction.opcode {
             Opcode::Add => {
                 if instruction.opcode.operand_count() > 0 {
@@ -131,6 +164,7 @@ impl InstructionExecutor {
                 } else {
                     panic!("Stack underflow");
                 }
+                None
             }, 
             Opcode::Store => {
                 if instruction.opcode.operand_count() != 1 {
@@ -141,26 +175,127 @@ impl InstructionExecutor {
 
                 // push the value to the stack
                 stack.push_back(value);
+                None
+            },
+            Opcode::Sub => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Sub instruction requires 0 operands");
+                }
+
+                let a = stack.pop_back();
+                let b = stack.pop_back();
+                
+                if let (Some(a), Some(b)) = (a, b) {
+                    // b - a (pop order)
+                    let result = self.alu.sub(b, a);
+                    stack.push_back(result);
+                } else {
+                    panic!("Stack underflow");
+                }
+                None
+            },
+            Opcode::LoadConstant => {
+                if instruction.opcode.operand_count() != 1 {
+                    panic!("LoadConstant instruction requires 1 operand");
+                }
+
+                let value = instruction.operands[0];
+                // push the value to the stack, like Store
+                stack.push_back(value);
+                None
+            },
+            Opcode::Multiply => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Multiply instruction requires 0 operands");
+                }
+
+                let a = stack.pop_back();
+                let b = stack.pop_back();
+                
+                if let (Some(a), Some(b)) = (a, b) {
+                    let result = self.alu.multiply(a, b);
+                    stack.push_back(result);
+                } else {
+                    panic!("Stack underflow");
+                }
+                None
+            },
+            Opcode::Print => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Print instruction requires 0 operands");
+                }
+
+                if let Some(value) = stack.back() {
+                    writeln!(self.output, "{}", value).expect("Failed to write to stdout");
+                } else {
+                    panic!("Stack underflow");
+                }
+                None
+            },
+            Opcode::LoadMemory => {
+                if instruction.opcode.operand_count() != 1 {
+                    panic!("LoadMemory instruction requires 1 operand");
+                }
+
+                let address = instruction.operands[0] as usize;
+                match memory.load(address) {
+                    Ok(value) => stack.push_back(value),
+                    Err(e) => panic!("Memory error: {}", e),
+                }
+                None
+            },
+            Opcode::StoreMemory => {
+                if instruction.opcode.operand_count() != 1 {
+                    panic!("StoreMemory instruction requires 1 operand");
+                }
+
+                let address = instruction.operands[0] as usize;
+                let value = stack.pop_back().expect("Stack underflow");
+                
+                match memory.store(address, value) {
+                    Ok(_) => {},
+                    Err(e) => panic!("Memory error: {}", e),
+                }
+                None
+            },
+            Opcode::JumpIfZero => {
+                if instruction.opcode.operand_count() != 1 {
+                    panic!("JumpIfZero instruction requires 1 operand");
+                }
+
+                let jump_address = instruction.operands[0] as usize;
+                
+                // The address should be a multiple of 4 (instruction size)
+                if jump_address % 4 != 0 {
+                    panic!("Jump address must be aligned to 4 bytes");
+                }
+                
+                // Jump if top of stack is zero
+                if let Some(value) = stack.pop_back() {
+                    if value == 0 {
+                        // Jump to the specified address
+                        return Some(jump_address);
+                    }
+                } else {
+                    panic!("Stack underflow in JumpIfZero");
+                }
+                None
             }
         }
     }
 }
 
-
-
 pub struct VirtualMachine {
-    pub stack: VecDeque<i32>, 
-    pub cpu: CPU, 
-    pub output: Stdout, 
+    pub cpu: CPU,
 }
 
 impl VirtualMachine {
     pub fn new() -> Self {
-        Self { stack: VecDeque::new(), cpu: CPU::new(), output: stdout() }
+        Self { cpu: CPU::new() }
     }
 
-    pub fn run(&mut self) {
-        self.cpu.step();
+    pub fn run(&mut self) -> bool {
+        self.cpu.step()
     }
 
     pub fn load_program(&mut self, program: &[u8]) {
@@ -168,9 +303,11 @@ impl VirtualMachine {
     }
 
     pub fn run_until_completion(&mut self) {
-        while self.cpu.fetcher.peek_next().is_some() {
-            self.run();
-        }
+        while self.run() {}
+    }
+    
+    pub fn stack_top(&self) -> Option<i32> {
+        self.cpu.stack.back().copied()
     }
 }
 
@@ -194,13 +331,125 @@ mod tests {
         ];
         
         let mut vm = VirtualMachine::new();
-
-
         vm.load_program(&program);
-
         vm.run_until_completion();
         
         // Check if result is 12 (5 + 7)
-        assert_eq!(vm.cpu.stack.pop_back(), Some(12));
+        assert_eq!(vm.stack_top(), Some(12));
+    }
+    
+    #[test]
+    fn test_new_opcodes() {
+        // Test Sub instruction: 10 - 4 = 6
+        let program = [
+            // LoadConstant 10
+            0x00, 0x00, 0x0A, 0x04,
+            // LoadConstant 4
+            0x00, 0x00, 0x04, 0x04,
+            // Sub instruction (10 - 4)
+            0x00, 0x00, 0x00, 0x03
+        ];
+        
+        let mut vm = VirtualMachine::new();
+        vm.load_program(&program);
+        vm.run_until_completion();
+        
+        // Check if result is 6 (10 - 4)
+        assert_eq!(vm.stack_top(), Some(6));
+    }
+    
+    #[test]
+    fn test_multiply() {
+        let program = [
+            // LoadConstant 6
+            0x00, 0x00, 0x06, 0x04,
+            // LoadConstant 7
+            0x00, 0x00, 0x07, 0x04,
+            // Multiply
+            0x00, 0x00, 0x00, 0x05
+        ];
+        
+        let mut vm = VirtualMachine::new();
+        vm.load_program(&program);
+        vm.run_until_completion();
+        
+        // Check if result is 42 (6 * 7)
+        assert_eq!(vm.stack_top(), Some(42));
+    }
+    
+    #[test]
+    fn test_memory_operations() {
+        let program = [
+            // LoadConstant 42 (value to store)
+            0x00, 0x00, 0x2A, 0x04,
+            // StoreMemory at address 100
+            0x00, 0x00, 0x64, 0x08,
+            // LoadMemory from address 100
+            0x00, 0x00, 0x64, 0x07
+        ];
+        
+        let mut vm = VirtualMachine::new();
+        vm.load_program(&program);
+        vm.run_until_completion();
+        
+        // Check if we loaded the same value we stored (42)
+        assert_eq!(vm.stack_top(), Some(42));
+    }
+    
+    #[test]
+    fn test_jump_if_zero() {
+        // Create a simple program to count from 3 down to 0
+        // and sum the numbers (3+2+1=6) with proper padding
+        let program = [
+            // Initialize memory[0] with counter = 3
+            0x00, 0x00, 0x03, 0x04, // (0) LoadConstant 3
+            0x00, 0x00, 0x00, 0x08, // (4) StoreMemory 0
+            
+            // Initialize memory[1] with sum = 0
+            0x00, 0x00, 0x00, 0x04, // (8) LoadConstant 0
+            0x00, 0x00, 0x01, 0x08, // (12) StoreMemory 1
+            
+            // Initialize memory[2] with constant 0 to use for jump condition
+            0x00, 0x00, 0x00, 0x04, // (16) LoadConstant 0
+            0x00, 0x00, 0x02, 0x08, // (20) StoreMemory 2
+            
+            // START LOOP (byte 24)
+            // Check if counter is 0, if yes exit loop
+            0x00, 0x00, 0x00, 0x07, // (24) LoadMemory 0 (counter)
+            0x00, 0x00, 0x58, 0x09, // (28) JumpIfZero 88 (exit loop)
+            
+            // Add counter to sum
+            0x00, 0x00, 0x00, 0x07, // (32) LoadMemory 0 (counter)
+            0x00, 0x00, 0x01, 0x07, // (36) LoadMemory 1 (sum)
+            0x00, 0x00, 0x00, 0x01, // (40) Add
+            0x00, 0x00, 0x01, 0x08, // (44) StoreMemory 1 (update sum)
+            
+            // Decrement counter
+            0x00, 0x00, 0x00, 0x07, // (48) LoadMemory 0 (counter)
+            0x00, 0x00, 0x01, 0x04, // (52) LoadConstant 1
+            0x00, 0x00, 0x00, 0x03, // (56) Sub
+            0x00, 0x00, 0x00, 0x08, // (60) StoreMemory 0 (update counter)
+            
+            // Load 0 from memory to use as jump condition (always true)
+            0x00, 0x00, 0x02, 0x07, // (64) LoadMemory 2 (constant 0)
+            0x00, 0x00, 0x18, 0x09, // (68) JumpIfZero 24 (go back to start of loop)
+            
+            // Padding instructions (not executed, just to make sure we have enough space)
+            0x00, 0x00, 0x00, 0x00, // (72) padding
+            0x00, 0x00, 0x00, 0x00, // (76) padding
+            0x00, 0x00, 0x00, 0x00, // (80) padding
+            0x00, 0x00, 0x00, 0x00, // (84) padding
+            
+            // LOOP EXIT (byte 88)
+            // Load the sum to check the result
+            0x00, 0x00, 0x01, 0x07, // (88) LoadMemory 1 (sum)
+        ];
+        
+        let mut vm = VirtualMachine::new();
+        vm.load_program(&program);
+        vm.run_until_completion();
+        
+        // The sum should be 6 (3+2+1)
+        assert_eq!(vm.stack_top(), Some(6));
     }
 }
