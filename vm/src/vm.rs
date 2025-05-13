@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, io::{stdout, Stdout, Write}};
 
-use crate::{instruction::{Instruction, RawInstruction, IntoRaw}, memory::{MemoryRegionType, SegmentedMemory, AccessPermission}, opcode::Opcode};
+use crate::{instruction::{Instruction, RawInstruction}, memory::{MemoryRegionType, SegmentedMemory, AccessPermission}, opcode::Opcode};
 
 pub struct CPU {
     fetcher: InstructionFetcher, 
