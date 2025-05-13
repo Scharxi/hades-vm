@@ -203,4 +203,22 @@ mod tests {
         // No more instructions
         assert!(!cpu.step());
     }
+
+    #[test]
+    fn test_cpu_execution_with_pickn() {
+        let program = vec![
+            0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
+            0x00, 0x00, 0x04, 0x04, // LoadConstant (opcode 4) with operand 4
+            0x00, 0x00, 0x00, 0x13, // PickN (opcode 19) with operand 1
+        ];
+
+        let mut cpu = CPU::new(1000);
+        cpu.load_program(&program);
+        
+        assert!(cpu.step()); // LoadConstant 3
+        assert!(cpu.step()); // LoadConstant 4
+        assert!(cpu.step()); // PickN
+        
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(4)));
+    }
 } 

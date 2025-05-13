@@ -156,6 +156,10 @@ pub struct Modulo;
 #[opcode = 0x12]
 pub struct Power;
 
+#[derive(IntoRaw)]
+#[opcode = 0x13]
+pub struct PickN(pub i32);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,6 +186,14 @@ mod tests {
         let instruction: Instruction = raw.into();
         assert_eq!(instruction.opcode, Opcode::Power);
         assert_eq!(instruction.operands, vec![]);
+    }
+
+    #[test]
+    fn test_pickn_instruction() {
+        let pickn = PickN(1);
+        let raw = pickn.into_raw();
+        assert_eq!(raw.opcode(), Opcode::PickN);
+        assert_eq!(raw.operand(), 1);
     }
 
     #[test]

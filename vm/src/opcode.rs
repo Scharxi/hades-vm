@@ -19,6 +19,7 @@ pub enum Opcode {
     StoreLocal = 0x10,
     Modulo = 0x11,
     Power = 0x12, 
+    PickN = 0x13, 
 }
 
 impl Opcode {
@@ -42,6 +43,7 @@ impl Opcode {
             Opcode::StoreLocal => 1,
             Opcode::Modulo => 0,
             Opcode::Power => 0,
+            Opcode::PickN => 1, 
         }
     }
 }
@@ -91,6 +93,8 @@ impl OpcodeMapping for Opcode {
             "LoadLocal" => Some(Opcode::LoadLocal as u8),
             "StoreLocal" => Some(Opcode::StoreLocal as u8),
             "Modulo" => Some(Opcode::Modulo as u8),
+            "Power" => Some(Opcode::Power as u8),
+            "PickN" => Some(Opcode::PickN as u8),
             _ => None,
         }
     }
