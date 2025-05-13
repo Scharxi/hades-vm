@@ -134,176 +134,402 @@ impl InstructionExecutor {
     pub fn execute(&mut self, instruction: &Instruction, stack: &mut Stack, memory: &mut SegmentedMemory) -> Option<usize> {
         match instruction.opcode {
             Opcode::Add => {
-                                if instruction.opcode.operand_count() > 0 {
-                                    panic!("Add instruction requires 0 operands");
-                                }
+                                        if instruction.opcode.operand_count() > 0 {
+                                            panic!("Add instruction requires 0 operands");
+                                        }
 
-                                let a = stack.pop();
-                                let b = stack.pop();
+                                        let a = stack.pop();
+                                        let b = stack.pop();
                 
-                                if let (Some(a), Some(b)) = (a, b) {
-                                    match (a, b) {
-                                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
-                                            let result = self.alu.add_int(a_val, b_val);
-                                            stack.push(StackValue::Integer(result));
-                                        },
-                                        (StackValue::Float(a_val), StackValue::Float(b_val)) => {
-                                            let result = self.alu.add_float(a_val, b_val);
-                                            stack.push(StackValue::Float(result));
-                                        },
-                                        _ => panic!("Type mismatch in Add operation"),
-                                    }
-                                } else {
-                                    panic!("Stack underflow");
-                                }
-                                None
-                            },
+                                        if let (Some(a), Some(b)) = (a, b) {
+                                            match (a, b) {
+                                                (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                                                    let result = self.alu.add_int(a_val, b_val);
+                                                    stack.push(StackValue::Integer(result));
+                                                },
+                                                (StackValue::Float(a_val), StackValue::Float(b_val)) => {
+                                                    let result = self.alu.add_float(a_val, b_val);
+                                                    stack.push(StackValue::Float(result));
+                                                },
+                                                _ => panic!("Type mismatch in Add operation"),
+                                            }
+                                        } else {
+                                            panic!("Stack underflow");
+                                        }
+                                        None
+                                    },
             Opcode::Store => {
-                                if instruction.opcode.operand_count() != 1 {
-                                    panic!("Store instruction requires 1 operand");
-                                }
+                                        if instruction.opcode.operand_count() != 1 {
+                                            panic!("Store instruction requires 1 operand");
+                                        }
 
-                                let value = instruction.operands[0];
+                                        let value = instruction.operands[0];
 
-                                // push the value to the stack as Integer
-                                stack.push(StackValue::Integer(value));
-                                None
-                            },
+                                        // push the value to the stack as Integer
+                                        stack.push(StackValue::Integer(value));
+                                        None
+                                    },
             Opcode::Sub => {
-                                if instruction.opcode.operand_count() > 0 {
-                                    panic!("Sub instruction requires 0 operands");
-                                }
+                                        if instruction.opcode.operand_count() > 0 {
+                                            panic!("Sub instruction requires 0 operands");
+                                        }
 
-                                let a = stack.pop();
-                                let b = stack.pop();
+                                        let a = stack.pop();
+                                        let b = stack.pop();
                 
-                                if let (Some(a), Some(b)) = (a, b) {
-                                    match (a, b) {
-                                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
-                                            // b - a (pop order)
-                                            let result = self.alu.sub_int(b_val, a_val);
-                                            stack.push(StackValue::Integer(result));
-                                        },
-                                        (StackValue::Float(a_val), StackValue::Float(b_val)) => {
-                                            let result = self.alu.sub_float(b_val, a_val);
-                                            stack.push(StackValue::Float(result));
-                                        },
-                                        _ => panic!("Type mismatch in Sub operation"),
-                                    }
-                                } else {
-                                    panic!("Stack underflow");
-                                }
-                                None
-                            },
+                                        if let (Some(a), Some(b)) = (a, b) {
+                                            match (a, b) {
+                                                (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                                                    // b - a (pop order)
+                                                    let result = self.alu.sub_int(b_val, a_val);
+                                                    stack.push(StackValue::Integer(result));
+                                                },
+                                                (StackValue::Float(a_val), StackValue::Float(b_val)) => {
+                                                    let result = self.alu.sub_float(b_val, a_val);
+                                                    stack.push(StackValue::Float(result));
+                                                },
+                                                _ => panic!("Type mismatch in Sub operation"),
+                                            }
+                                        } else {
+                                            panic!("Stack underflow");
+                                        }
+                                        None
+                                    },
             Opcode::LoadConstant => {
-                                if instruction.opcode.operand_count() != 1 {
-                                    panic!("LoadConstant instruction requires 1 operand");
-                                }
+                                        if instruction.opcode.operand_count() != 1 {
+                                            panic!("LoadConstant instruction requires 1 operand");
+                                        }
 
-                                let value = instruction.operands[0];
-                                // push the value to the stack as Integer
-                                stack.push(StackValue::Integer(value));
-                                None
-                            },
+                                        let value = instruction.operands[0];
+                                        // push the value to the stack as Integer
+                                        stack.push(StackValue::Integer(value));
+                                        None
+                                    },
             Opcode::Multiply => {
+                                        if instruction.opcode.operand_count() > 0 {
+                                            panic!("Multiply instruction requires 0 operands");
+                                        }
+
+                                        let a = stack.pop();
+                                        let b = stack.pop();
+                
+                                        if let (Some(a), Some(b)) = (a, b) {
+                                            match (a, b) {
+                                                (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                                                    let result = self.alu.multiply_int(a_val, b_val);
+                                                    stack.push(StackValue::Integer(result));
+                                                },
+                                                (StackValue::Float(a_val), StackValue::Float(b_val)) => {
+                                                    let result = self.alu.multiply_float(a_val, b_val);
+                                                    stack.push(StackValue::Float(result));
+                                                },
+                                                _ => panic!("Type mismatch in Multiply operation"),
+                                            }
+                                        } else {
+                                            panic!("Stack underflow");
+                                        }
+                                        None
+                                    },
+            Opcode::Print => {
+                                        if instruction.opcode.operand_count() > 0 {
+                                            panic!("Print instruction requires 0 operands");
+                                        }
+
+                                        if let Some(value) = stack.peek() {
+                                            match value {
+                                                StackValue::Integer(i) => writeln!(self.output, "Integer: {}", i),
+                                                StackValue::Float(f) => writeln!(self.output, "Float: {}", f),
+                                                StackValue::Boolean(b) => writeln!(self.output, "Boolean: {}", b),
+                                                StackValue::Reference(r) => writeln!(self.output, "Reference: 0x{:x}", r),
+                                            }.expect("Failed to write to stdout");
+                                        } else {
+                                            panic!("Stack underflow");
+                                        }
+                                        None
+                                    },
+            Opcode::LoadMemory => {
+                                        if instruction.opcode.operand_count() != 1 {
+                                            panic!("LoadMemory instruction requires 1 operand");
+                                        }
+
+                                        let address = instruction.operands[0] as usize;
+                                        match memory.read(address) {
+                                            Ok(value) => stack.push(StackValue::Integer(value)),
+                                            Err(e) => panic!("Memory error: {}", e),
+                                        }
+                                        None
+                                    },
+            Opcode::StoreMemory => {
+                                        if instruction.opcode.operand_count() != 1 {
+                                            panic!("StoreMemory instruction requires 1 operand");
+                                        }
+
+                                        let address = instruction.operands[0] as usize;
+                                        let value = stack.pop().expect("Stack underflow");
+                
+                                        match value {
+                                            StackValue::Integer(i) => {
+                                                match memory.write(address, i) {
+                                                    Ok(_) => {},
+                                                    Err(e) => panic!("Memory error: {}", e),
+                                                }
+                                            },
+                                            _ => panic!("Can only store integers in memory"),
+                                        }
+                                        None
+                                    },
+            Opcode::JumpIfZero => {
+                                        if instruction.opcode.operand_count() != 1 {
+                                            panic!("JumpIfZero instruction requires 1 operand");
+                                        }
+
+                                        let jump_address = instruction.operands[0] as usize;
+                
+                                        // The address should be a multiple of 4 (instruction size)
+                                        if jump_address % 4 != 0 {
+                                            panic!("Jump address must be aligned to 4 bytes");
+                                        }
+                
+                                        // Jump if top of stack is zero
+                                        if let Some(value) = stack.pop() {
+                                            if value.is_zero() {
+                                                // Jump to the specified address
+                                                return Some(jump_address);
+                                            }
+                                        } else {
+                                            panic!("Stack underflow in JumpIfZero");
+                                        }
+                                        None
+                                    },
+            Opcode::Divide => {
                                 if instruction.opcode.operand_count() > 0 {
-                                    panic!("Multiply instruction requires 0 operands");
+                                    panic!("Divide instruction requires 0 operands");
                                 }
 
                                 let a = stack.pop();
                                 let b = stack.pop();
-                
+
                                 if let (Some(a), Some(b)) = (a, b) {
                                     match (a, b) {
                                         (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
-                                            let result = self.alu.multiply_int(a_val, b_val);
+                                            if a_val == 0 {
+                                                panic!("Division by zero");
+                                            }
+                                            let result = self.alu.divide_int(b_val, a_val);
                                             stack.push(StackValue::Integer(result));
                                         },
                                         (StackValue::Float(a_val), StackValue::Float(b_val)) => {
-                                            let result = self.alu.multiply_float(a_val, b_val);
+                                            if a_val == 0.0 {
+                                                panic!("Division by zero");
+                                            }
+                                            let result = self.alu.divide_float(b_val, a_val);
                                             stack.push(StackValue::Float(result));
                                         },
-                                        _ => panic!("Type mismatch in Multiply operation"),
+                                        _ => panic!("Type mismatch in Divide operation"),
                                     }
                                 } else {
                                     panic!("Stack underflow");
                                 }
+
                                 None
                             },
-            Opcode::Print => {
-                                if instruction.opcode.operand_count() > 0 {
-                                    panic!("Print instruction requires 0 operands");
-                                }
-
-                                if let Some(value) = stack.peek() {
-                                    match value {
-                                        StackValue::Integer(i) => writeln!(self.output, "Integer: {}", i),
-                                        StackValue::Float(f) => writeln!(self.output, "Float: {}", f),
-                                        StackValue::Boolean(b) => writeln!(self.output, "Boolean: {}", b),
-                                        StackValue::Reference(r) => writeln!(self.output, "Reference: 0x{:x}", r),
-                                    }.expect("Failed to write to stdout");
-                                } else {
-                                    panic!("Stack underflow");
-                                }
-                                None
-                            },
-            Opcode::LoadMemory => {
-                                if instruction.opcode.operand_count() != 1 {
-                                    panic!("LoadMemory instruction requires 1 operand");
-                                }
-
-                                let address = instruction.operands[0] as usize;
-                                match memory.read(address) {
+            Opcode::LoadFromRegion => {
+                                let region_id = instruction.operands[0] as usize;
+                                let offset = instruction.operands[1] as usize;
+                
+                                // Region-ID in RegionType umwandeln
+                                let region_type = match region_id {
+                                    0 => MemoryRegionType::Code,
+                                    1 => MemoryRegionType::Data,
+                                    2 => MemoryRegionType::Stack,
+                                    3 => MemoryRegionType::Heap,
+                                    4 => MemoryRegionType::Constants,
+                                    5 => MemoryRegionType::IO,
+                                    _ => return None,
+                                };
+                
+                                let value = memory.read_from_region(region_type, offset);
+                                match value {
                                     Ok(value) => stack.push(StackValue::Integer(value)),
                                     Err(e) => panic!("Memory error: {}", e),
                                 }
                                 None
                             },
-            Opcode::StoreMemory => {
-                                if instruction.opcode.operand_count() != 1 {
-                                    panic!("StoreMemory instruction requires 1 operand");
-                                }
-
-                                let address = instruction.operands[0] as usize;
-                                let value = stack.pop().expect("Stack underflow");
+            Opcode::StoreToRegion => {
+                                let region_id = instruction.operands[0] as usize;
+                                let offset = instruction.operands[1] as usize;
+                                let value = stack.pop().unwrap_or(StackValue::Integer(0));
+                
+                                // Region-ID in RegionType umwandeln
+                                let region_type = match region_id {
+                                    0 => MemoryRegionType::Code,
+                                    1 => MemoryRegionType::Data,
+                                    2 => MemoryRegionType::Stack,
+                                    3 => MemoryRegionType::Heap,
+                                    4 => MemoryRegionType::Constants,
+                                    5 => MemoryRegionType::IO,
+                                    _ => return None,
+                                };
                 
                                 match value {
                                     StackValue::Integer(i) => {
-                                        match memory.write(address, i) {
-                                            Ok(_) => {},
+                                        match memory.write_to_region(region_type, offset, i) {
+                                            Ok(_) => None,
                                             Err(e) => panic!("Memory error: {}", e),
                                         }
                                     },
-                                    _ => panic!("Can only store integers in memory"),
+                                    _ => panic!("Can only store integers in memory regions"),
                                 }
-                                None
                             },
-            Opcode::JumpIfZero => {
-                                if instruction.opcode.operand_count() != 1 {
-                                    panic!("JumpIfZero instruction requires 1 operand");
-                                }
-
-                                let jump_address = instruction.operands[0] as usize;
+            Opcode::Call => {
+                                let address = instruction.operands[0] as usize;
+                                let local_count = instruction.operands[1] as usize;
                 
-                                // The address should be a multiple of 4 (instruction size)
-                                if jump_address % 4 != 0 {
-                                    panic!("Jump address must be aligned to 4 bytes");
+                                // Sicherstellen, dass genügend Elemente auf dem Stack liegen
+                                if stack.values.len() < local_count {
+                                    panic!("Stack underflow in Call: Not enough values on stack for {} parameters", local_count);
                                 }
                 
-                                // Jump if top of stack is zero
-                                if let Some(value) = stack.pop() {
-                                    if value.is_zero() {
-                                        // Jump to the specified address
-                                        return Some(jump_address);
+                                // Parameter sind bereits auf dem Stack
+                                let base_pointer = if local_count > 0 {
+                                    stack.values.len() - local_count
+                                } else {
+                                    stack.values.len()
+                                };
+                
+                                // Das Return-Address-Handling sollte in der CPU passieren
+                                // Hier verwenden wir einen temporären Wert
+                                let return_address = address + 4;
+                
+                                // Frame erstellen
+                                let frame = StackFrame {
+                                    return_address,
+                                    base_pointer,
+                                    local_count,
+                                };
+                
+                                // Debug-Ausgabe
+                                println!("Call: addr={}, locals={}, base={}, stack={:?}",
+                                        address, local_count, base_pointer, stack.values);
+                
+                                // Frame hinzufügen
+                                stack.frames.push(frame);
+                                stack.current_frame = Some(stack.frames.len() - 1);
+                
+                                // Springe zur Funktionsadresse
+                                Some(address)
+                            },
+            Opcode::Return => {
+                                // Muss mindestens einen Frame haben
+                                if stack.frames.is_empty() {
+                                    panic!("Return without call frame");
+                                }
+                
+                                // Aktuellen Frame holen
+                                let frame_idx = stack.current_frame.unwrap();
+                                let current_frame = stack.frames[frame_idx].clone();
+                                let return_address = current_frame.return_address;
+                                let base_pointer = current_frame.base_pointer;
+                
+                                // Ist ein Rückgabewert auf dem Stack?
+                                let return_value = if stack.values.len() > base_pointer {
+                                    Some(stack.values.last().unwrap().clone())
+                                } else {
+                                    None
+                                };
+                
+                                // Debug-Ausgabe
+                                println!("Return: addr={}, base={}, stack={:?}, return_value={:?}",
+                                        return_address, base_pointer, stack.values, return_value);
+                
+                                // Lokale Variablen und Parameter entfernen
+                                stack.values.truncate(base_pointer);
+                
+                                // Frame entfernen
+                                stack.frames.pop();
+                                stack.current_frame = if stack.frames.is_empty() {
+                                    None
+                                } else {
+                                    Some(stack.frames.len() - 1)
+                                };
+                
+                                // Rückgabewert (falls vorhanden) wieder auf den Stack legen
+                                if let Some(value) = return_value {
+                                    stack.values.push(value);
+                                }
+                
+                                // Zur Rücksprungadresse zurückkehren
+                                Some(return_address)
+                            },
+            Opcode::LoadLocal => {
+                                let local_index = instruction.operands[0] as usize;
+                
+                                // Lokale Variablen vom aktuellen Frame laden
+                                if let Some(frame_idx) = stack.current_frame {
+                                    // Sicherstellen, dass der Frame-Index gültig ist
+                                    if frame_idx >= stack.frames.len() {
+                                        panic!("LoadLocal: Invalid frame index: {}", frame_idx);
+                                    }
+                    
+                                    let frame = &stack.frames[frame_idx];
+                    
+                                    // Sicherstellen, dass der lokale Index gültig ist
+                                    if local_index >= frame.local_count {
+                                        panic!("LoadLocal: Local index {} out of bounds (local_count={})",
+                                              local_index, frame.local_count);
+                                    }
+                    
+                                    // Debug-Ausgabe
+                                    println!("LoadLocal: frame={}, idx={}, base={}, stack={:?}",
+                                            frame_idx, local_index, frame.base_pointer, stack.values);
+                    
+                                    // Berechne den tatsächlichen Index im Stack
+                                    let stack_index = frame.base_pointer + local_index;
+                    
+                                    // Überprüfe, ob der berechnete Index im Stack-Bereich liegt
+                                    if stack_index >= stack.values.len() {
+                                        panic!("LoadLocal: Stack index {} out of bounds (stack_len={})",
+                                              stack_index, stack.values.len());
+                                    }
+                    
+                                    // Lade den Wert und füge ihn zum Stack hinzu
+                                    let value = stack.values[stack_index];
+                                    stack.push(value);
+                    
+                                    None
+                                } else {
+                                    panic!("LoadLocal: No active stack frame");
+                                }
+                            },
+            Opcode::StoreLocal => {
+                                let local_index = instruction.operands[0] as usize;
+                                let value = stack.pop().expect("Stack underflow");
+                
+                                // Store value in local variable
+                                if let Some(frame_idx) = stack.current_frame {
+                                    if frame_idx < stack.frames.len() {
+                                        let frame = &stack.frames[frame_idx];
+                                        // Berechne den tatsächlichen Index im Stack
+                                        let stack_index = frame.base_pointer + local_index;
+                        
+                                        // Überprüfe, ob der Index gültig ist
+                                        if stack_index < stack.values.len() {
+                                            // Speichere den Wert in den Stack an der entsprechenden Position
+                                            stack.values[stack_index] = value;
+                                            None
+                                        } else {
+                                            panic!("Invalid local variable index: {} (stack index: {})", local_index, stack_index);
+                                        }
+                                    } else {
+                                        panic!("Invalid frame index");
                                     }
                                 } else {
-                                    panic!("Stack underflow in JumpIfZero");
+                                    panic!("No active stack frame");
                                 }
-                                None
                             },
-            Opcode::Divide => {
+            Opcode::Modulo => {
                         if instruction.opcode.operand_count() > 0 {
-                            panic!("Divide instruction requires 0 operands");
+                            panic!("Modulo instruction requires 0 operands");
                         }
 
                         let a = stack.pop();
@@ -312,224 +538,19 @@ impl InstructionExecutor {
                         if let (Some(a), Some(b)) = (a, b) {
                             match (a, b) {
                                 (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
-                                    if a_val == 0 {
-                                        panic!("Division by zero");
-                                    }
-                                    let result = self.alu.divide_int(b_val, a_val);
+                                    let result = self.alu.modulo(b_val, a_val);
                                     stack.push(StackValue::Integer(result));
                                 },
-                                (StackValue::Float(a_val), StackValue::Float(b_val)) => {
-                                    if a_val == 0.0 {
-                                        panic!("Division by zero");
-                                    }
-                                    let result = self.alu.divide_float(b_val, a_val);
-                                    stack.push(StackValue::Float(result));
-                                },
-                                _ => panic!("Type mismatch in Divide operation"),
+                                _ => panic!("Type mismatch in Modulo operation"),
                             }
                         } else {
                             panic!("Stack underflow");
                         }
-
                         None
                     },
-            Opcode::LoadFromRegion => {
-                        let region_id = instruction.operands[0] as usize;
-                        let offset = instruction.operands[1] as usize;
-                
-                        // Region-ID in RegionType umwandeln
-                        let region_type = match region_id {
-                            0 => MemoryRegionType::Code,
-                            1 => MemoryRegionType::Data,
-                            2 => MemoryRegionType::Stack,
-                            3 => MemoryRegionType::Heap,
-                            4 => MemoryRegionType::Constants,
-                            5 => MemoryRegionType::IO,
-                            _ => return None,
-                        };
-                
-                        let value = memory.read_from_region(region_type, offset);
-                        match value {
-                            Ok(value) => stack.push(StackValue::Integer(value)),
-                            Err(e) => panic!("Memory error: {}", e),
-                        }
-                        None
-                    },
-            Opcode::StoreToRegion => {
-                        let region_id = instruction.operands[0] as usize;
-                        let offset = instruction.operands[1] as usize;
-                        let value = stack.pop().unwrap_or(StackValue::Integer(0));
-                
-                        // Region-ID in RegionType umwandeln
-                        let region_type = match region_id {
-                            0 => MemoryRegionType::Code,
-                            1 => MemoryRegionType::Data,
-                            2 => MemoryRegionType::Stack,
-                            3 => MemoryRegionType::Heap,
-                            4 => MemoryRegionType::Constants,
-                            5 => MemoryRegionType::IO,
-                            _ => return None,
-                        };
-                
-                        match value {
-                            StackValue::Integer(i) => {
-                                match memory.write_to_region(region_type, offset, i) {
-                                    Ok(_) => None,
-                                    Err(e) => panic!("Memory error: {}", e),
-                                }
-                            },
-                            _ => panic!("Can only store integers in memory regions"),
-                        }
-                    },
-            Opcode::Call => {
-                        let address = instruction.operands[0] as usize;
-                        let local_count = instruction.operands[1] as usize;
-                
-                        // Sicherstellen, dass genügend Elemente auf dem Stack liegen
-                        if stack.values.len() < local_count {
-                            panic!("Stack underflow in Call: Not enough values on stack for {} parameters", local_count);
-                        }
-                
-                        // Parameter sind bereits auf dem Stack
-                        let base_pointer = if local_count > 0 {
-                            stack.values.len() - local_count
-                        } else {
-                            stack.values.len()
-                        };
-                
-                        // Das Return-Address-Handling sollte in der CPU passieren
-                        // Hier verwenden wir einen temporären Wert
-                        let return_address = address + 4;
-                
-                        // Frame erstellen
-                        let frame = StackFrame {
-                            return_address,
-                            base_pointer,
-                            local_count,
-                        };
-                
-                        // Debug-Ausgabe
-                        println!("Call: addr={}, locals={}, base={}, stack={:?}",
-                                address, local_count, base_pointer, stack.values);
-                
-                        // Frame hinzufügen
-                        stack.frames.push(frame);
-                        stack.current_frame = Some(stack.frames.len() - 1);
-                
-                        // Springe zur Funktionsadresse
-                        Some(address)
-                    },
-            Opcode::Return => {
-                        // Muss mindestens einen Frame haben
-                        if stack.frames.is_empty() {
-                            panic!("Return without call frame");
-                        }
-                
-                        // Aktuellen Frame holen
-                        let frame_idx = stack.current_frame.unwrap();
-                        let current_frame = stack.frames[frame_idx].clone();
-                        let return_address = current_frame.return_address;
-                        let base_pointer = current_frame.base_pointer;
-                
-                        // Ist ein Rückgabewert auf dem Stack?
-                        let return_value = if stack.values.len() > base_pointer {
-                            Some(stack.values.last().unwrap().clone())
-                        } else {
-                            None
-                        };
-                
-                        // Debug-Ausgabe
-                        println!("Return: addr={}, base={}, stack={:?}, return_value={:?}",
-                                return_address, base_pointer, stack.values, return_value);
-                
-                        // Lokale Variablen und Parameter entfernen
-                        stack.values.truncate(base_pointer);
-                
-                        // Frame entfernen
-                        stack.frames.pop();
-                        stack.current_frame = if stack.frames.is_empty() {
-                            None
-                        } else {
-                            Some(stack.frames.len() - 1)
-                        };
-                
-                        // Rückgabewert (falls vorhanden) wieder auf den Stack legen
-                        if let Some(value) = return_value {
-                            stack.values.push(value);
-                        }
-                
-                        // Zur Rücksprungadresse zurückkehren
-                        Some(return_address)
-                    },
-            Opcode::LoadLocal => {
-                        let local_index = instruction.operands[0] as usize;
-                
-                        // Lokale Variablen vom aktuellen Frame laden
-                        if let Some(frame_idx) = stack.current_frame {
-                            // Sicherstellen, dass der Frame-Index gültig ist
-                            if frame_idx >= stack.frames.len() {
-                                panic!("LoadLocal: Invalid frame index: {}", frame_idx);
-                            }
-                    
-                            let frame = &stack.frames[frame_idx];
-                    
-                            // Sicherstellen, dass der lokale Index gültig ist
-                            if local_index >= frame.local_count {
-                                panic!("LoadLocal: Local index {} out of bounds (local_count={})",
-                                      local_index, frame.local_count);
-                            }
-                    
-                            // Debug-Ausgabe
-                            println!("LoadLocal: frame={}, idx={}, base={}, stack={:?}",
-                                    frame_idx, local_index, frame.base_pointer, stack.values);
-                    
-                            // Berechne den tatsächlichen Index im Stack
-                            let stack_index = frame.base_pointer + local_index;
-                    
-                            // Überprüfe, ob der berechnete Index im Stack-Bereich liegt
-                            if stack_index >= stack.values.len() {
-                                panic!("LoadLocal: Stack index {} out of bounds (stack_len={})",
-                                      stack_index, stack.values.len());
-                            }
-                    
-                            // Lade den Wert und füge ihn zum Stack hinzu
-                            let value = stack.values[stack_index];
-                            stack.push(value);
-                    
-                            None
-                        } else {
-                            panic!("LoadLocal: No active stack frame");
-                        }
-                    },
-            Opcode::StoreLocal => {
-                        let local_index = instruction.operands[0] as usize;
-                        let value = stack.pop().expect("Stack underflow");
-                
-                        // Store value in local variable
-                        if let Some(frame_idx) = stack.current_frame {
-                            if frame_idx < stack.frames.len() {
-                                let frame = &stack.frames[frame_idx];
-                                // Berechne den tatsächlichen Index im Stack
-                                let stack_index = frame.base_pointer + local_index;
-                        
-                                // Überprüfe, ob der Index gültig ist
-                                if stack_index < stack.values.len() {
-                                    // Speichere den Wert in den Stack an der entsprechenden Position
-                                    stack.values[stack_index] = value;
-                                    None
-                                } else {
-                                    panic!("Invalid local variable index: {} (stack index: {})", local_index, stack_index);
-                                }
-                            } else {
-                                panic!("Invalid frame index");
-                            }
-                        } else {
-                            panic!("No active stack frame");
-                        }
-                    },
-            Opcode::Modulo => {
+            Opcode::Power => {
                 if instruction.opcode.operand_count() > 0 {
-                    panic!("Modulo instruction requires 0 operands");
+                    panic!("Power instruction requires 0 operands");
                 }
 
                 let a = stack.pop();
@@ -538,10 +559,10 @@ impl InstructionExecutor {
                 if let (Some(a), Some(b)) = (a, b) {
                     match (a, b) {
                         (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
-                            let result = self.alu.modulo(b_val, a_val);
+                            let result = self.alu.power(b_val, a_val);
                             stack.push(StackValue::Integer(result));
                         },
-                        _ => panic!("Type mismatch in Modulo operation"),
+                        _ => panic!("Type mismatch in Power operation"),
                     }
                 } else {
                     panic!("Stack underflow");

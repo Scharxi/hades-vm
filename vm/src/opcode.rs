@@ -18,6 +18,7 @@ pub enum Opcode {
     LoadLocal = 0xF,
     StoreLocal = 0x10,
     Modulo = 0x11,
+    Power = 0x12, 
 }
 
 impl Opcode {
@@ -40,6 +41,7 @@ impl Opcode {
             Opcode::LoadLocal => 1,
             Opcode::StoreLocal => 1,
             Opcode::Modulo => 0,
+            Opcode::Power => 0,
         }
     }
 }

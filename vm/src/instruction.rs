@@ -152,6 +152,10 @@ pub struct StoreToRegion(pub i32, pub i32); // Region-ID, Offset
 #[opcode = 0x11] 
 pub struct Modulo;
 
+#[derive(IntoRaw)]
+#[opcode = 0x12]
+pub struct Power;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,6 +166,22 @@ mod tests {
         let raw = modulo.into_raw();
         assert_eq!(raw.opcode(), Opcode::Modulo);
         assert!(!raw.has_operands());
+    }
+
+    #[test]
+    fn test_power_instruction() {
+        let power = Power;
+        let raw = power.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Power);
+        assert!(!raw.has_operands());
+    }
+
+    #[test]
+    fn test_power_instruction_from_raw() {
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x12);
+        let instruction: Instruction = raw.into();
+        assert_eq!(instruction.opcode, Opcode::Power);
+        assert_eq!(instruction.operands, vec![]);
     }
 
     #[test]

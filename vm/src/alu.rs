@@ -65,6 +65,12 @@ impl ALU {
             remainder + b
         }
     }
+    
+    /// Performs mathematical power operation.
+    /// Returns b raised to the power of a.
+    pub fn power(&self, b_val: i32, a_val: i32) -> i32 {
+        b_val.wrapping_pow(a_val as u32)
+    }
 }
 
 #[cfg(test)]
@@ -96,6 +102,10 @@ mod tests {
         assert_eq!(alu.modulo(-10, 3), 2);
         assert_eq!(alu.modulo(10, -3), -2);
         assert_eq!(alu.modulo(-10, -3), -1);
+
+        // Power
+        assert_eq!(alu.power(2, 3), 8);
+        assert_eq!(alu.power(-2, 3), -8);
     }
 
     #[test]
