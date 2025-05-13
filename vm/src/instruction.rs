@@ -160,6 +160,10 @@ pub struct Power;
 #[opcode = 0x13]
 pub struct PickN(pub i32);
 
+#[derive(IntoRaw)]
+#[opcode = 0x14]
+pub struct Dup;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,6 +198,14 @@ mod tests {
         let raw = pickn.into_raw();
         assert_eq!(raw.opcode(), Opcode::PickN);
         assert_eq!(raw.operand(), 1);
+    }
+
+    #[test]
+    fn test_dup_instruction() {
+        let dup = Dup;
+        let raw = dup.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Dup);
+        assert!(!raw.has_operands());
     }
 
     #[test]

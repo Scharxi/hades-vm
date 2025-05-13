@@ -221,4 +221,22 @@ mod tests {
         
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(4)));
     }
+
+    #[test]
+    fn test_cpu_execution_with_dup() {
+        let program = vec![
+            0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
+            0x00, 0x00, 0x00, 0x14, // Dup (opcode 20)
+        ];
+
+        let mut cpu = CPU::new(1000);
+        cpu.load_program(&program);
+        
+        assert!(cpu.step()); // LoadConstant 3
+        assert!(cpu.step()); // Dup
+        
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
+        assert_eq!(cpu.stack.len(), 2);
+    }
 } 

@@ -2,7 +2,7 @@
 #[repr(u8)]
 pub enum Opcode {
     Add = 0x1,
-    Store = 0x2, 
+    Store = 0x2,
     Sub = 0x3,
     LoadConstant = 0x4,
     Multiply = 0x5,
@@ -18,8 +18,9 @@ pub enum Opcode {
     LoadLocal = 0xF,
     StoreLocal = 0x10,
     Modulo = 0x11,
-    Power = 0x12, 
-    PickN = 0x13, 
+    Power = 0x12,
+    PickN = 0x13,
+    Dup = 0x14,
 }
 
 impl Opcode {
@@ -43,7 +44,8 @@ impl Opcode {
             Opcode::StoreLocal => 1,
             Opcode::Modulo => 0,
             Opcode::Power => 0,
-            Opcode::PickN => 1, 
+            Opcode::PickN => 1,
+            Opcode::Dup => 0,
         }
     }
 }
@@ -59,7 +61,6 @@ impl From<u8> for Opcode {
         unsafe { std::mem::transmute(value) }
     }
 }
-
 
 impl From<i32> for Opcode {
     fn from(value: i32) -> Self {

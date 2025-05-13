@@ -605,6 +605,15 @@ impl InstructionExecutor {
                 stack.copy_nth_to_top(n);
                 None
             }
+            Opcode::Dup => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Dup instruction requires 0 operands");
+                }
+
+                let value = stack.peek().expect("Stack underflow");
+                stack.push(*value);
+                None
+            }
         }
     }
 }
