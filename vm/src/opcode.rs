@@ -17,13 +17,14 @@ pub enum Opcode {
     Return = 0xE,
     LoadLocal = 0xF,
     StoreLocal = 0x10,
+    Modulo = 0x11,
 }
 
 impl Opcode {
     pub fn operand_count(&self) -> usize {
         match self {
             Opcode::Add => 0,
-            Opcode::Store => 1, 
+            Opcode::Store => 1,
             Opcode::Sub => 0,
             Opcode::Divide => 0,
             Opcode::LoadFromRegion => 2,
@@ -38,6 +39,7 @@ impl Opcode {
             Opcode::Return => 0,
             Opcode::LoadLocal => 1,
             Opcode::StoreLocal => 1,
+            Opcode::Modulo => 0,
         }
     }
 }
@@ -86,6 +88,7 @@ impl OpcodeMapping for Opcode {
             "Return" => Some(Opcode::Return as u8),
             "LoadLocal" => Some(Opcode::LoadLocal as u8),
             "StoreLocal" => Some(Opcode::StoreLocal as u8),
+            "Modulo" => Some(Opcode::Modulo as u8),
             _ => None,
         }
     }

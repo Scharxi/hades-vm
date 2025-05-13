@@ -148,9 +148,21 @@ pub struct LoadFromRegion(pub i32, pub i32); // Region-ID, Offset
 #[opcode = 0x0C]
 pub struct StoreToRegion(pub i32, pub i32); // Region-ID, Offset
 
+#[derive(IntoRaw)]
+#[opcode = 0x11] 
+pub struct Modulo;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_modulo_instruction() {
+        let modulo = Modulo;
+        let raw = modulo.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Modulo);
+        assert!(!raw.has_operands());
+    }
 
     #[test]
     fn test_raw_instruction() {

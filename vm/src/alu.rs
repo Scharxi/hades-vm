@@ -49,6 +49,22 @@ impl ALU {
     pub fn divide_float(&self, a: f32, b: f32) -> f32 {
         a / b
     }
+
+    /// Performs mathematical modulo operation.
+    /// Unlike Rust's remainder operator (%), this implements
+    /// true mathematical modulo where the result is always
+    /// in the range [0, |b|) for positive b, or (b, 0] for negative b.
+    pub fn modulo(&self, a: i32, b: i32) -> i32 {
+        let remainder = a % b;
+        
+        // If remainder is 0 or has the same sign as b, return it
+        if remainder == 0 || (remainder > 0 && b > 0) || (remainder < 0 && b < 0) {
+            remainder
+        } else {
+            // Otherwise, add b to get the correct mathematical modulo
+            remainder + b
+        }
+    }
 }
 
 #[cfg(test)]
@@ -74,6 +90,12 @@ mod tests {
         // Division
         assert_eq!(alu.divide_int(35, 5), 7);
         assert_eq!(alu.divide_int(10, 3), 3); // Integer division
+
+        // Modulo
+        assert_eq!(alu.modulo(10, 3), 1);
+        assert_eq!(alu.modulo(-10, 3), 2);
+        assert_eq!(alu.modulo(10, -3), -2);
+        assert_eq!(alu.modulo(-10, -3), -1);
     }
 
     #[test]
