@@ -17,4 +17,5 @@ path = "vm/src/lib.rs"
 intoraw-derive = { path = "intoraw-derive", optional = true }
 
 [features]
+default = ["derive"]
 derive = ["intoraw-derive"]

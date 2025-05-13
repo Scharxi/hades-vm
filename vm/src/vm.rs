@@ -56,6 +56,10 @@ impl ALU {
     pub fn multiply(&self, a: i32, b: i32) -> i32 {
         a * b
     }
+
+    pub fn divide(&self, a: i32, b: i32) -> i32 {
+        a / b
+    }
 }
 
 pub struct InstructionFetcher {
@@ -151,134 +155,151 @@ impl InstructionExecutor {
     pub fn execute(&mut self, instruction: &Instruction, stack: &mut VecDeque<i32>, memory: &mut Memory) -> Option<usize> {
         match instruction.opcode {
             Opcode::Add => {
-                if instruction.opcode.operand_count() > 0 {
-                    panic!("Add instruction requires 0 operands");
-                }
+                        if instruction.opcode.operand_count() > 0 {
+                            panic!("Add instruction requires 0 operands");
+                        }
 
-                let a = stack.pop_back();
-                let b = stack.pop_back();
+                        let a = stack.pop_back();
+                        let b = stack.pop_back();
                 
-                if let (Some(a), Some(b)) = (a, b) {
-                    let result = self.alu.add(a, b);
-                    stack.push_back(result);
-                } else {
-                    panic!("Stack underflow");
-                }
-                None
-            }, 
+                        if let (Some(a), Some(b)) = (a, b) {
+                            let result = self.alu.add(a, b);
+                            stack.push_back(result);
+                        } else {
+                            panic!("Stack underflow");
+                        }
+                        None
+                    },
             Opcode::Store => {
-                if instruction.opcode.operand_count() != 1 {
-                    panic!("Store instruction requires 1 operand");
-                }
+                        if instruction.opcode.operand_count() != 1 {
+                            panic!("Store instruction requires 1 operand");
+                        }
 
-                let value = instruction.operands[0];
+                        let value = instruction.operands[0];
 
-                // push the value to the stack
-                stack.push_back(value);
-                None
-            },
+                        // push the value to the stack
+                        stack.push_back(value);
+                        None
+                    },
             Opcode::Sub => {
-                if instruction.opcode.operand_count() > 0 {
-                    panic!("Sub instruction requires 0 operands");
-                }
+                        if instruction.opcode.operand_count() > 0 {
+                            panic!("Sub instruction requires 0 operands");
+                        }
 
-                let a = stack.pop_back();
-                let b = stack.pop_back();
+                        let a = stack.pop_back();
+                        let b = stack.pop_back();
                 
-                if let (Some(a), Some(b)) = (a, b) {
-                    // b - a (pop order)
-                    let result = self.alu.sub(b, a);
-                    stack.push_back(result);
-                } else {
-                    panic!("Stack underflow");
-                }
-                None
-            },
+                        if let (Some(a), Some(b)) = (a, b) {
+                            // b - a (pop order)
+                            let result = self.alu.sub(b, a);
+                            stack.push_back(result);
+                        } else {
+                            panic!("Stack underflow");
+                        }
+                        None
+                    },
             Opcode::LoadConstant => {
-                if instruction.opcode.operand_count() != 1 {
-                    panic!("LoadConstant instruction requires 1 operand");
-                }
+                        if instruction.opcode.operand_count() != 1 {
+                            panic!("LoadConstant instruction requires 1 operand");
+                        }
 
-                let value = instruction.operands[0];
-                // push the value to the stack, like Store
-                stack.push_back(value);
-                None
-            },
+                        let value = instruction.operands[0];
+                        // push the value to the stack, like Store
+                        stack.push_back(value);
+                        None
+                    },
             Opcode::Multiply => {
+                        if instruction.opcode.operand_count() > 0 {
+                            panic!("Multiply instruction requires 0 operands");
+                        }
+
+                        let a = stack.pop_back();
+                        let b = stack.pop_back();
+                
+                        if let (Some(a), Some(b)) = (a, b) {
+                            let result = self.alu.multiply(a, b);
+                            stack.push_back(result);
+                        } else {
+                            panic!("Stack underflow");
+                        }
+                        None
+                    },
+            Opcode::Print => {
+                        if instruction.opcode.operand_count() > 0 {
+                            panic!("Print instruction requires 0 operands");
+                        }
+
+                        if let Some(value) = stack.back() {
+                            writeln!(self.output, "{}", value).expect("Failed to write to stdout");
+                        } else {
+                            panic!("Stack underflow");
+                        }
+                        None
+                    },
+            Opcode::LoadMemory => {
+                        if instruction.opcode.operand_count() != 1 {
+                            panic!("LoadMemory instruction requires 1 operand");
+                        }
+
+                        let address = instruction.operands[0] as usize;
+                        match memory.load(address) {
+                            Ok(value) => stack.push_back(value),
+                            Err(e) => panic!("Memory error: {}", e),
+                        }
+                        None
+                    },
+            Opcode::StoreMemory => {
+                        if instruction.opcode.operand_count() != 1 {
+                            panic!("StoreMemory instruction requires 1 operand");
+                        }
+
+                        let address = instruction.operands[0] as usize;
+                        let value = stack.pop_back().expect("Stack underflow");
+                
+                        match memory.store(address, value) {
+                            Ok(_) => {},
+                            Err(e) => panic!("Memory error: {}", e),
+                        }
+                        None
+                    },
+            Opcode::JumpIfZero => {
+                        if instruction.opcode.operand_count() != 1 {
+                            panic!("JumpIfZero instruction requires 1 operand");
+                        }
+
+                        let jump_address = instruction.operands[0] as usize;
+                
+                        // The address should be a multiple of 4 (instruction size)
+                        if jump_address % 4 != 0 {
+                            panic!("Jump address must be aligned to 4 bytes");
+                        }
+                
+                        // Jump if top of stack is zero
+                        if let Some(value) = stack.pop_back() {
+                            if value == 0 {
+                                // Jump to the specified address
+                                return Some(jump_address);
+                            }
+                        } else {
+                            panic!("Stack underflow in JumpIfZero");
+                        }
+                        None
+                    },
+            Opcode::Divide =>   {
                 if instruction.opcode.operand_count() > 0 {
-                    panic!("Multiply instruction requires 0 operands");
+                    panic!("Divide instruction requires 0 operands");
                 }
 
                 let a = stack.pop_back();
                 let b = stack.pop_back();
-                
+
                 if let (Some(a), Some(b)) = (a, b) {
-                    let result = self.alu.multiply(a, b);
+                    let result = self.alu.divide(b, a);
                     stack.push_back(result);
                 } else {
                     panic!("Stack underflow");
                 }
-                None
-            },
-            Opcode::Print => {
-                if instruction.opcode.operand_count() > 0 {
-                    panic!("Print instruction requires 0 operands");
-                }
 
-                if let Some(value) = stack.back() {
-                    writeln!(self.output, "{}", value).expect("Failed to write to stdout");
-                } else {
-                    panic!("Stack underflow");
-                }
-                None
-            },
-            Opcode::LoadMemory => {
-                if instruction.opcode.operand_count() != 1 {
-                    panic!("LoadMemory instruction requires 1 operand");
-                }
-
-                let address = instruction.operands[0] as usize;
-                match memory.load(address) {
-                    Ok(value) => stack.push_back(value),
-                    Err(e) => panic!("Memory error: {}", e),
-                }
-                None
-            },
-            Opcode::StoreMemory => {
-                if instruction.opcode.operand_count() != 1 {
-                    panic!("StoreMemory instruction requires 1 operand");
-                }
-
-                let address = instruction.operands[0] as usize;
-                let value = stack.pop_back().expect("Stack underflow");
-                
-                match memory.store(address, value) {
-                    Ok(_) => {},
-                    Err(e) => panic!("Memory error: {}", e),
-                }
-                None
-            },
-            Opcode::JumpIfZero => {
-                if instruction.opcode.operand_count() != 1 {
-                    panic!("JumpIfZero instruction requires 1 operand");
-                }
-
-                let jump_address = instruction.operands[0] as usize;
-                
-                // The address should be a multiple of 4 (instruction size)
-                if jump_address % 4 != 0 {
-                    panic!("Jump address must be aligned to 4 bytes");
-                }
-                
-                // Jump if top of stack is zero
-                if let Some(value) = stack.pop_back() {
-                    if value == 0 {
-                        // Jump to the specified address
-                        return Some(jump_address);
-                    }
-                } else {
-                    panic!("Stack underflow in JumpIfZero");
-                }
                 None
             }
         }
@@ -451,5 +472,24 @@ mod tests {
         
         // The sum should be 6 (3+2+1)
         assert_eq!(vm.stack_top(), Some(6));
+    }
+
+    #[test]
+    fn test_divide() {
+        let program = [
+            // LoadConstant 10
+            0x00, 0x00, 0x0A, 0x04,
+            // LoadConstant 2
+            0x00, 0x00, 0x02, 0x04,
+            // Divide
+            0x00, 0x00, 0x00, 0x0A
+        ];
+        
+        let mut vm = VirtualMachine::new();
+        vm.load_program(&program);
+        vm.run_until_completion();
+        
+        // The result should be 5 (10 / 2)
+        assert_eq!(vm.stack_top(), Some(5));
     }
 }

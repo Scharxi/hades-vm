@@ -4,4 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-intoraw-derive = { path = "../intoraw-derive"}
+intoraw-derive = { path = "../intoraw-derive", optional = true }
+
+[features]
+default = ["derive"]
+derive = ["intoraw-derive"]
+
+# Add this to make opcode definitions available for the derive macro
+[lib]
+name = "vm"
+path = "src/lib.rs"

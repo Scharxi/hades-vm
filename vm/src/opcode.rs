@@ -10,6 +10,7 @@ pub enum Opcode {
     LoadMemory = 0x7,
     StoreMemory = 0x8,
     JumpIfZero = 0x9,
+    Divide = 0xA,
 }
 
 impl Opcode {
@@ -18,6 +19,7 @@ impl Opcode {
             Opcode::Add => 0,
             Opcode::Store => 1, 
             Opcode::Sub => 0,
+            Opcode::Divide => 0,
             Opcode::LoadConstant => 1,
             Opcode::Multiply => 0,
             Opcode::Print => 0,
@@ -44,5 +46,28 @@ impl From<u8> for Opcode {
 impl From<i32> for Opcode {
     fn from(value: i32) -> Self {
         Opcode::from(value as u8)
+    }
+}
+
+/// Trait to allow mapping between opcode names and their values
+pub trait OpcodeMapping {
+    /// Get the opcode value from the type name
+    fn get_opcode_from_name(name: &str) -> Option<u8>;
+}
+
+impl OpcodeMapping for Opcode {
+    fn get_opcode_from_name(name: &str) -> Option<u8> {
+        match name {
+            "Add" => Some(Opcode::Add as u8),
+            "Store" => Some(Opcode::Store as u8),
+            "Sub" => Some(Opcode::Sub as u8),
+            "LoadConstant" => Some(Opcode::LoadConstant as u8),
+            "Multiply" => Some(Opcode::Multiply as u8),
+            "Print" => Some(Opcode::Print as u8),
+            "LoadMemory" => Some(Opcode::LoadMemory as u8),
+            "StoreMemory" => Some(Opcode::StoreMemory as u8),
+            "JumpIfZero" => Some(Opcode::JumpIfZero as u8),
+            _ => None,
+        }
     }
 }

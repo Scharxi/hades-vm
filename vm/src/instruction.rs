@@ -62,109 +62,83 @@ impl From<RawInstruction> for Instruction {
 }
 
 /// This trait allows instruction types to be converted to RawInstruction
+///
+/// There are two ways to implement this trait:
+/// 1. Manually implement for custom instruction types
+/// 2. Use the `#[derive(IntoRaw)]` attribute when the `derive` feature is enabled
+///
+/// When using the derive attribute, you can specify the opcode in several ways:
+/// - Using a literal value: `#[opcode = 1]` or `#[opcode = 0x01]`
+/// - Using a string literal: `#[opcode = "1"]`
+///
+/// The numeric values should correspond to the opcodes defined in the `Opcode` enum:
+/// - 1 (0x01): Add
+/// - 2 (0x02): Store
+/// - 3 (0x03): Sub
+/// - 4 (0x04): LoadConstant
+/// - 5 (0x05): Multiply
+/// - 6 (0x06): Print
+/// - 7 (0x07): LoadMemory
+/// - 8 (0x08): StoreMemory
+/// - 9 (0x09): JumpIfZero
+///
+/// If no opcode is specified, the macro will try to infer it from the struct name.
+/// The macro uses sophisticated name normalization to work with various naming conventions:
+/// 
+/// - Standard names: `Add`, `Store`, etc.
+/// - With prefixes: `CustomAdd`, `DirectStore`, `MyAdd`, etc.
+/// - With suffixes: `AddInstruction`, etc.
+/// - Mixed case: `addInstruction`, `SUB_INSTRUCTION`, etc.
+/// - Compound names: `MyCustomStoreInstruction`, etc.
+///
+/// For instructions with operands, create a tuple struct with a single field (e.g., `struct Store(i32)`).
+/// For instructions without operands, create a unit struct (e.g., `struct Add;`).
 pub trait IntoRaw {
     fn into_raw(self) -> RawInstruction;
 }
 
 // Define instruction types with manual implementations
+#[derive(IntoRaw)]
 pub struct Add;
 
-impl IntoRaw for Add {
-    fn into_raw(self) -> RawInstruction {
-        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x01)
-    }
-}
 
+#[derive(IntoRaw)]
+#[opcode = 0x02]
 pub struct Store(pub i32);
 
-impl IntoRaw for Store {
-    fn into_raw(self) -> RawInstruction {
-        // Extract the operand from the first field
-        let operand = self.0;
-        let b0 = ((operand >> 16) & 0xFF) as u8;
-        let b1 = ((operand >> 8) & 0xFF) as u8;
-        let b2 = (operand & 0xFF) as u8;
-        
-        // Create instruction with the appropriate opcode
-        RawInstruction::from_bytes(b0, b1, b2, 0x02)
-    }
-}
 
+#[derive(IntoRaw)]
+#[opcode = 0x03]    
 pub struct Sub;
 
-impl IntoRaw for Sub {
-    fn into_raw(self) -> RawInstruction {
-        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x03)
-    }
-}
-
+#[derive(IntoRaw)]
+#[opcode = 0x04]
 pub struct LoadConstant(pub i32);
 
-impl IntoRaw for LoadConstant {
-    fn into_raw(self) -> RawInstruction {
-        let operand = self.0;
-        let b0 = ((operand >> 16) & 0xFF) as u8;
-        let b1 = ((operand >> 8) & 0xFF) as u8;
-        let b2 = (operand & 0xFF) as u8;
-        
-        RawInstruction::from_bytes(b0, b1, b2, 0x04)
-    }
-}
-
+#[derive(IntoRaw)]
+#[opcode = 0x05]
 pub struct Multiply;
 
-impl IntoRaw for Multiply {
-    fn into_raw(self) -> RawInstruction {
-        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x05)
-    }
-}
-
+#[derive(IntoRaw)]
+#[opcode = 0x06]
 pub struct Print;
 
-impl IntoRaw for Print {
-    fn into_raw(self) -> RawInstruction {
-        RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x06)
-    }
-}
-
+#[derive(IntoRaw)]
+#[opcode = 0x07]
 pub struct LoadMemory(pub i32);
 
-impl IntoRaw for LoadMemory {
-    fn into_raw(self) -> RawInstruction {
-        let operand = self.0;
-        let b0 = ((operand >> 16) & 0xFF) as u8;
-        let b1 = ((operand >> 8) & 0xFF) as u8;
-        let b2 = (operand & 0xFF) as u8;
-        
-        RawInstruction::from_bytes(b0, b1, b2, 0x07)
-    }
-}
-
+#[derive(IntoRaw)]
+#[opcode = 0x08]
 pub struct StoreMemory(pub i32);
 
-impl IntoRaw for StoreMemory {
-    fn into_raw(self) -> RawInstruction {
-        let operand = self.0;
-        let b0 = ((operand >> 16) & 0xFF) as u8;
-        let b1 = ((operand >> 8) & 0xFF) as u8;
-        let b2 = (operand & 0xFF) as u8;
-        
-        RawInstruction::from_bytes(b0, b1, b2, 0x08)
-    }
-}
-
+#[derive(IntoRaw)]
+#[opcode = 0x09]
 pub struct JumpIfZero(pub i32);
 
-impl IntoRaw for JumpIfZero {
-    fn into_raw(self) -> RawInstruction {
-        let operand = self.0;
-        let b0 = ((operand >> 16) & 0xFF) as u8;
-        let b1 = ((operand >> 8) & 0xFF) as u8;
-        let b2 = (operand & 0xFF) as u8;
-        
-        RawInstruction::from_bytes(b0, b1, b2, 0x09)
-    }
-}
+#[derive(IntoRaw)]
+#[opcode = 0x0A]
+pub struct Divide;
+
 
 #[cfg(test)]
 mod tests {
@@ -208,9 +182,30 @@ mod tests {
 // Example of using the derive macro when feature is enabled
 #[cfg(feature = "derive")]
 mod derive_tests {
+    #![allow(unused_imports)]
+    #![allow(dead_code)]
+
     use super::*;
+    use crate::opcode::Opcode;
     
-    // Types using the derive macro
+    // Using opcodes by their numeric values
+    #[derive(IntoRaw)]
+    #[opcode = 0x01]
+    struct DirectAdd;
+    
+    #[derive(IntoRaw)]
+    #[opcode = 0x02]
+    struct DirectStore(i32);
+    
+    #[derive(IntoRaw)]
+    #[opcode = 0x03]
+    struct DirectSub;
+    
+    #[derive(IntoRaw)]
+    #[opcode = 0x04] // Use literal value instead of Opcode::LoadConstant
+    struct DirectLoadConstant(i32);
+    
+    // Existing tests with string values
     #[derive(IntoRaw)]
     #[opcode = "1"] // Must be literal values, not identifiers
     struct CustomAdd;
@@ -221,28 +216,53 @@ mod derive_tests {
     
     // Example for custom opcode specification with attribute
     #[derive(IntoRaw)]
-    #[opcode = "3"] // Sub opcode
+    #[opcode = 3] // Sub opcode
     struct CustomSub;
     
     #[derive(IntoRaw)]
-    #[opcode = "4"] // LoadConstant opcode with operand
+    #[opcode = 4] // LoadConstant opcode with operand
     struct CustomLoadConstant(i32);
     
     #[derive(IntoRaw)]
-    #[opcode = "5"] // Multiply opcode
+    #[opcode = 5] // Multiply opcode
     struct CustomMultiply;
     
     #[derive(IntoRaw)]
-    #[opcode = "6"] // Print opcode
+    #[opcode = 6] // Print opcode
     struct CustomPrint;
     
     #[derive(IntoRaw)]
-    #[opcode = "7"] // LoadMemory opcode with operand
+    #[opcode = 7] // LoadMemory opcode with operand
     struct CustomLoadMemory(i32);
     
     #[derive(IntoRaw)]
-    #[opcode = "8"] // StoreMemory opcode with operand
+    #[opcode = 8] // StoreMemory opcode with operand
     struct CustomStoreMemory(i32);
+    
+    #[test]
+    fn test_direct_opcode_paths() {
+        // Test DirectAdd
+        let add = DirectAdd;
+        let raw = add.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Add);
+        
+        // Test DirectStore
+        let store = DirectStore(123);
+        let raw = store.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.operand(), 123);
+        
+        // Test DirectSub
+        let sub = DirectSub;
+        let raw = sub.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Sub);
+        
+        // Test DirectLoadConstant
+        let load = DirectLoadConstant(42);
+        let raw = load.into_raw();
+        assert_eq!(raw.opcode(), Opcode::LoadConstant);
+        assert_eq!(raw.operand(), 42);
+    }
     
     #[test]
     fn test_derive_macro() {
@@ -285,6 +305,30 @@ mod derive_tests {
         let raw = store_mem.into_raw();
         assert_eq!(raw.as_i32() & 0xFF, 8);
         assert_eq!(raw.operand(), 200);
+    }
+
+    // Test flexible naming conventions
+    #[derive(IntoRaw)]
+    struct AddInstruction;  // No explicit opcode, will infer from name
+    
+    #[derive(IntoRaw)]
+    struct MyCustomStoreInstruction(i32);  // Uses normalized name "Store"
+    
+    // Test various advanced name patterns
+    #[test]
+    fn test_flexible_naming() {
+        // Test AddInstruction (name normalization)
+        let add = AddInstruction;
+        let raw = add.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Add);
+        assert!(!raw.has_operands());
+        
+        // Test MyCustomStoreInstruction (with custom prefix and suffix)
+        let store = MyCustomStoreInstruction(42);
+        let raw = store.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.operand(), 42);
+        assert!(raw.has_operands());
     }
 }
 
