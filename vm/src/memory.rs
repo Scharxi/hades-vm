@@ -503,8 +503,301 @@ impl SegmentedMemory {
         self.region_map.resize(new_size, None);
         Ok(())
     }
-}
+    
+    /// Allocates a new block of memory of the specified size.
+    ///
+    /// This method searches for a free space in the heap region that can accommodate
+    /// the requested size. It implements a simple first-fit allocation strategy and
+    /// tracks allocations in memory to allow multiple allocations and reuse of freed memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - The size of the memory block to allocate in words
+    ///
+    /// # Returns
+    ///
+    /// `Some(address)` if allocation was successful, `None` if there is not enough space
+    pub fn allocate(&mut self, size: usize) -> Option<usize> {
+        if size == 0 {
+            return None; // Can't allocate zero bytes
+        }
 
+        // Get the heap region
+        let heap_region = match self.regions.get(&MemoryRegionType::Heap) {
+            Some(region) => region,
+            None => return None, // No heap region defined
+        };
+        
+        // Check if the heap has write permissions
+        if !heap_region.has_permission(AccessPermission::Write) {
+            return None; // Heap is not writable
+        }
+        
+        // For this implementation, we'll track our allocations by using the first 
+        // few words of the heap itself as an allocation bitmap
+        let heap_start = heap_region.start;
+        let heap_size = heap_region.size;
+        
+        // The first word contains our allocation bitmap version (to detect initialization)
+        // We use 0xALLOC as our bitmap marker
+        const ALLOC_MARKER: i32 = 0xA110C;
+        
+        // Check if our allocation bitmap is initialized
+        let bitmap_initialized = match self.read(heap_start) {
+            Ok(marker) => marker == ALLOC_MARKER,
+            Err(_) => false,
+        };
+        
+        // If not initialized, set up our allocation bitmap
+        if !bitmap_initialized {
+            // Write our marker
+            if let Err(_err) = self.write(heap_start, ALLOC_MARKER) {
+                return None; // Can't initialize bitmap
+            }
+            
+            // Reserve space for the bitmap itself: 1 word for marker + 1 word for allocation count
+            // The rest of the bitmap will grow as needed
+            const BITMAP_HEADER_SIZE: usize = 2;
+            
+            // Mark all memory as free in a single large block
+            // Store the first free block's size right after the bitmap header
+            if let Err(_err) = self.write(heap_start + BITMAP_HEADER_SIZE, (heap_size - BITMAP_HEADER_SIZE - 1) as i32) {
+                return None; // Can't initialize free list
+            }
+            
+            // Write 0 to indicate this block is free
+            if let Err(_err) = self.write(heap_start + BITMAP_HEADER_SIZE + 1, 0) {
+                return None;
+            }
+            
+            // Store the number of blocks (just 1 initially)
+            if let Err(_err) = self.write(heap_start + 1, 1) {
+                return None;
+            }
+        }
+        
+        // Read the number of blocks
+        let block_count = match self.read(heap_start + 1) {
+            Ok(count) => count as usize,
+            Err(_) => return None,
+        };
+        
+        // The bitmap header size: marker + count
+        const BITMAP_HEADER_SIZE: usize = 2;
+        
+        // Each block entry in the bitmap uses 3 words:
+        // 1. Block start address
+        // 2. Block size
+        // 3. Allocation flag (0 = free, 1 = allocated)
+        const BLOCK_ENTRY_SIZE: usize = 3;
+        
+        // Scan through the blocks to find a suitable free block using first-fit
+        for i in 0..block_count {
+            let block_entry_offset = BITMAP_HEADER_SIZE + i * BLOCK_ENTRY_SIZE;
+            
+            // Read block information
+            let block_addr = match self.read(heap_start + block_entry_offset) {
+                Ok(addr) => addr as usize,
+                Err(_) => continue, // Skip this block if we can't read it
+            };
+            
+            let block_size = match self.read(heap_start + block_entry_offset + 1) {
+                Ok(size) => size as usize,
+                Err(_) => continue,
+            };
+            
+            let is_allocated = match self.read(heap_start + block_entry_offset + 2) {
+                Ok(flag) => flag != 0,
+                Err(_) => continue,
+            };
+            
+            // If the block is free and large enough, use it
+            if !is_allocated && block_size >= size {
+                // If the block is significantly larger than needed, split it
+                if block_size > size + BLOCK_ENTRY_SIZE + 1 {
+                    // Update the current block's size
+                    if let Err(_) = self.write(heap_start + block_entry_offset + 1, size as i32) {
+                        continue;
+                    }
+                    
+                    // Mark the current block as allocated
+                    if let Err(_) = self.write(heap_start + block_entry_offset + 2, 1) {
+                        continue;
+                    }
+                    
+                    // Create a new block entry for the remainder
+                    let new_block_addr = block_addr + size;
+                    let new_block_size = block_size - size;
+                    
+                    // Write the new block's information
+                    let new_block_offset = BITMAP_HEADER_SIZE + block_count * BLOCK_ENTRY_SIZE;
+                    
+                    if let Err(_) = self.write(heap_start + new_block_offset, new_block_addr as i32) {
+                        // Just use the whole block if we can't split it
+                        return Some(block_addr);
+                    }
+                    
+                    if let Err(_) = self.write(heap_start + new_block_offset + 1, new_block_size as i32) {
+                        return Some(block_addr);
+                    }
+                    
+                    if let Err(_) = self.write(heap_start + new_block_offset + 2, 0) {
+                        return Some(block_addr);
+                    }
+                    
+                    // Update the block count
+                    if let Err(_) = self.write(heap_start + 1, (block_count + 1) as i32) {
+                        return Some(block_addr);
+                    }
+                    
+                    return Some(block_addr);
+                } else {
+                    // Just mark the whole block as allocated
+                    if let Err(_) = self.write(heap_start + block_entry_offset + 2, 1) {
+                        continue;
+                    }
+                    
+                    return Some(block_addr);
+                }
+            }
+        }
+        
+        // If we get here, no suitable block was found
+        // Try to allocate from the end of the bitmap
+        let bitmap_size = BITMAP_HEADER_SIZE + block_count * BLOCK_ENTRY_SIZE;
+        
+        // Check if we have enough space for the allocation
+        if heap_size > bitmap_size + size + BLOCK_ENTRY_SIZE {
+            let available_size = heap_size - bitmap_size - size;
+            
+            // Make sure we have enough space for both the bitmap expansion and the allocation
+            if available_size >= BLOCK_ENTRY_SIZE {
+                // Create a new block entry
+                let new_block_addr = heap_start + bitmap_size;
+                
+                // Write the new block's information
+                if let Err(_) = self.write(new_block_addr, (new_block_addr + BLOCK_ENTRY_SIZE) as i32) {
+                    return None;
+                }
+                
+                if let Err(_) = self.write(new_block_addr + 1, size as i32) {
+                    return None;
+                }
+                
+                if let Err(_) = self.write(new_block_addr + 2, 1) { // Mark as allocated
+                    return None;
+                }
+                
+                // Update the block count
+                if let Err(_) = self.write(heap_start + 1, (block_count + 1) as i32) {
+                    return None;
+                }
+                
+                return Some(new_block_addr + BLOCK_ENTRY_SIZE);
+            }
+        }
+        
+        // No suitable block found and no space to create a new one
+        None
+    }
+    
+    /// Deallocates a previously allocated memory block.
+    ///
+    /// This method marks a previously allocated block as free in the heap's allocation bitmap.
+    /// It finds the block by its address and, if found and marked as allocated, sets it to free.
+    /// This operation does not actually clear the memory contents; it just makes the space
+    /// available for future allocations.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The address of the memory block to deallocate
+    ///
+    /// # Returns
+    ///
+    /// `true` if deallocation was successful, `false` if the address was not allocated
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use vm::memory::{SegmentedMemory, MemoryRegionType};
+    /// # let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
+    /// // Allocate some memory
+    /// let address = memory.allocate(100).unwrap();
+    ///
+    /// // Use the memory...
+    ///
+    /// // Free it when done
+    /// let success = memory.deallocate(address);
+    /// assert!(success);
+    /// ```
+    pub fn deallocate(&mut self, address: usize) -> bool {
+        // Get the heap region
+        let heap_region = match self.regions.get(&MemoryRegionType::Heap) {
+            Some(region) => region,
+            None => return false, // No heap region defined
+        };
+        
+        let heap_start = heap_region.start;
+        
+        // Check if our allocation bitmap is initialized
+        const ALLOC_MARKER: i32 = 0xA110C;
+        let bitmap_initialized = match self.read(heap_start) {
+            Ok(marker) => marker == ALLOC_MARKER,
+            Err(_) => false,
+        };
+        
+        if !bitmap_initialized {
+            return false; // Bitmap not initialized, nothing to deallocate
+        }
+        
+        // Read the number of blocks
+        let block_count = match self.read(heap_start + 1) {
+            Ok(count) => count as usize,
+            Err(_) => return false,
+        };
+        
+        // The bitmap header size: marker + count
+        const BITMAP_HEADER_SIZE: usize = 2;
+        
+        // Each block entry in the bitmap uses 3 words:
+        // 1. Block start address
+        // 2. Block size
+        // 3. Allocation flag (0 = free, 1 = allocated)
+        const BLOCK_ENTRY_SIZE: usize = 3;
+        
+        // Scan through the blocks to find the one with the given address
+        for i in 0..block_count {
+            let block_entry_offset = BITMAP_HEADER_SIZE + i * BLOCK_ENTRY_SIZE;
+            
+            // Read block information
+            let block_addr = match self.read(heap_start + block_entry_offset) {
+                Ok(addr) => addr as usize,
+                Err(_) => continue,
+            };
+            
+            // Check if this is the block we're looking for
+            if block_addr == address {
+                // Check if it's allocated
+                let is_allocated = match self.read(heap_start + block_entry_offset + 2) {
+                    Ok(flag) => flag != 0,
+                    Err(_) => continue,
+                };
+                
+                if is_allocated {
+                    // Mark the block as free
+                    if let Err(_) = self.write(heap_start + block_entry_offset + 2, 0) {
+                        return false;
+                    }
+                    
+                    return true;
+                }
+            }
+        }
+        
+        // Block not found or not allocated
+        false
+    }
+}
 
 impl SegmentedMemory {
     /// Creates a standard memory layout for a general-purpose VM.
@@ -831,5 +1124,72 @@ mod tests {
         
         // Memory Map ausgeben (für Debug-Zwecke)
         println!("{}", memory.memory_map());
+    }
+
+    #[test]
+    fn test_memory_allocation() {
+        // Create a memory with a test layout that includes a heap region
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
+        
+        // Get the heap region to check its starting address for validation
+        // We need to clone the heap region to avoid borrowing issues
+        let heap_region = memory.regions.get(&MemoryRegionType::Heap).unwrap().clone();
+        
+        // Try to allocate some memory
+        let allocation = memory.allocate(100);
+        assert!(allocation.is_some());
+        
+        // The first allocation should be at the start of the heap plus some metadata overhead
+        let expected_start = heap_region.start + 2; // Bitmap marker + count
+        assert!(allocation.unwrap() >= expected_start);
+        
+        // Try to allocate too much memory
+        let too_large = memory.allocate(2000);
+        assert!(too_large.is_none());
+    }
+
+    #[test]
+    fn test_memory_allocation_and_deallocation() {
+        // Create a memory with a test layout that includes a heap region
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
+        
+        // Allocate memory blocks of different sizes
+        let addr1 = memory.allocate(50).unwrap(); // First allocation
+        let addr2 = memory.allocate(25).unwrap(); // Second allocation
+        let addr3 = memory.allocate(10).unwrap(); // Third allocation
+        
+        // Verify all allocations succeeded
+        assert!(addr1 != 0);
+        assert!(addr2 != 0);
+        assert!(addr3 != 0);
+        
+        // They should be different addresses
+        assert_ne!(addr1, addr2);
+        assert_ne!(addr1, addr3);
+        assert_ne!(addr2, addr3);
+        
+        // Deallocate the middle block
+        let success = memory.deallocate(addr2);
+        assert!(success);
+        
+        // Try to deallocate the same block again (should fail)
+        let failed = memory.deallocate(addr2);
+        assert!(!failed);
+        
+        // Try to allocate a block of size 20 - should fit in the freed space
+        let addr4 = memory.allocate(20).unwrap();
+        
+        // Verify it worked
+        assert!(addr4 != 0);
+        assert_ne!(addr4, addr1);
+        assert_ne!(addr4, addr3);
+        
+        // It might reuse the space from addr2, but we can't assume that
+        // since the implementation might use different allocation strategies
+        
+        // Deallocate all remaining blocks
+        assert!(memory.deallocate(addr1));
+        assert!(memory.deallocate(addr3));
+        assert!(memory.deallocate(addr4));
     }
 }

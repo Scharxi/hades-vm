@@ -23,6 +23,11 @@ pub enum Opcode {
     Dup = 0x14,
     Swap = 0x15,
     Drop = 0x16,
+    Alloc = 0x50,
+    Free = 0x51,
+    LoadHeap = 0x52,  // Laden von Werten aus dem Heap
+    StoreHeap = 0x53, // Speichern von Werten im Heap
+    MemSet = 0x54,    // Initialisieren eines Speicherbereichs mit einem Wert
 }
 
 impl Opcode {
@@ -50,6 +55,11 @@ impl Opcode {
             Opcode::Dup => 0,
             Opcode::Swap => 0,
             Opcode::Drop => 0,
+            Opcode::Alloc => 1,
+            Opcode::Free => 0, // Takes no operands, pops address from stack
+            Opcode::LoadHeap => 0, // Erwartet zwei Werte auf dem Stack: Adresse und Offset
+            Opcode::StoreHeap => 0, // Erwartet drei Werte auf dem Stack: Adresse, Offset und Wert
+            Opcode::MemSet => 0, // Erwartet drei Werte auf dem Stack: Adresse, Anzahl und Wert
         }
     }
 }
@@ -100,6 +110,11 @@ impl OpcodeMapping for Opcode {
             "Modulo" => Some(Opcode::Modulo as u8),
             "Power" => Some(Opcode::Power as u8),
             "PickN" => Some(Opcode::PickN as u8),
+            "Alloc" => Some(Opcode::Alloc as u8),
+            "Free" => Some(Opcode::Free as u8),
+            "LoadHeap" => Some(Opcode::LoadHeap as u8),
+            "StoreHeap" => Some(Opcode::StoreHeap as u8),
+            "MemSet" => Some(Opcode::MemSet as u8),
             _ => None,
         }
     }

@@ -632,6 +632,166 @@ impl InstructionExecutor {
 
                 stack.pop();
                 None
+            }, 
+            Opcode::Alloc => {
+                if instruction.opcode.operand_count() != 1 {
+                    panic!("Alloc instruction requires 1 operand");
+                }
+
+                let size = instruction.operands[0] as usize;
+                let pointer = memory.allocate(size);
+                
+                // If allocation succeeds, push the address as a reference
+                // If it fails, push a null reference (0)
+                match pointer {
+                    Some(addr) => stack.push(StackValue::Reference(addr)),
+                    None => stack.push(StackValue::Reference(0)), // Null pointer
+                }
+                
+                None
+            }
+            Opcode::Free => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Free instruction requires 0 operands");
+                }
+
+                // Pop the address from the stack
+                match stack.pop() {
+                    Some(StackValue::Reference(addr)) => {
+                        if addr == 0 {
+                            // Null pointer, nothing to free
+                            return None;
+                        }
+                        
+                        // Try to deallocate the memory
+                        let success = memory.deallocate(addr);
+                        
+                        // Push success/failure indicator to the stack
+                        stack.push(StackValue::Boolean(success));
+                    }
+                    Some(_) => panic!("Free: Expected a reference on the stack"),
+                    None => panic!("Stack underflow in Free instruction"),
+                }
+                
+                None
+            }
+            Opcode::LoadHeap => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("LoadHeap instruction requires 0 operands");
+                }
+
+                // Pop offset and address from the stack
+                let offset = match stack.pop() {
+                    Some(StackValue::Integer(offset)) => offset as usize,
+                    Some(_) => panic!("LoadHeap: Expected integer offset on the stack"),
+                    None => panic!("Stack underflow in LoadHeap instruction"),
+                };
+
+                let addr = match stack.pop() {
+                    Some(StackValue::Reference(addr)) => addr,
+                    Some(_) => panic!("LoadHeap: Expected a reference on the stack"),
+                    None => panic!("Stack underflow in LoadHeap instruction"),
+                };
+
+                if addr == 0 {
+                    panic!("LoadHeap: Null pointer dereference");
+                }
+
+                // Calculate the absolute address
+                let absolute_addr = addr + offset;
+
+                // Read from memory
+                match memory.read(absolute_addr) {
+                    Ok(value) => {
+                        stack.push(StackValue::Integer(value));
+                    },
+                    Err(e) => {
+                        panic!("LoadHeap: Memory error: {}", e);
+                    }
+                }
+
+                None
+            }
+            Opcode::StoreHeap => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("StoreHeap instruction requires 0 operands");
+                }
+
+                // Pop value, offset and address from the stack
+                let value = match stack.pop() {
+                    Some(StackValue::Integer(value)) => value,
+                    Some(_) => panic!("StoreHeap: Expected integer value on the stack"),
+                    None => panic!("Stack underflow in StoreHeap instruction"),
+                };
+
+                let offset = match stack.pop() {
+                    Some(StackValue::Integer(offset)) => offset as usize,
+                    Some(_) => panic!("StoreHeap: Expected integer offset on the stack"),
+                    None => panic!("Stack underflow in StoreHeap instruction"),
+                };
+
+                let addr = match stack.pop() {
+                    Some(StackValue::Reference(addr)) => addr,
+                    Some(_) => panic!("StoreHeap: Expected a reference on the stack"),
+                    None => panic!("Stack underflow in StoreHeap instruction"),
+                };
+
+                if addr == 0 {
+                    panic!("StoreHeap: Null pointer dereference");
+                }
+
+                // Calculate the absolute address
+                let absolute_addr = addr + offset;
+
+                // Write to memory
+                match memory.write(absolute_addr, value) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        panic!("StoreHeap: Memory error: {}", e);
+                    }
+                }
+
+                None
+            }
+            Opcode::MemSet => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("MemSet instruction requires 0 operands");
+                }
+
+                // Pop value, count and address from the stack
+                let value = match stack.pop() {
+                    Some(StackValue::Integer(value)) => value,
+                    Some(_) => panic!("MemSet: Expected integer value on the stack"),
+                    None => panic!("Stack underflow in MemSet instruction"),
+                };
+
+                let count = match stack.pop() {
+                    Some(StackValue::Integer(count)) => count as usize,
+                    Some(_) => panic!("MemSet: Expected integer count on the stack"),
+                    None => panic!("Stack underflow in MemSet instruction"),
+                };
+
+                let addr = match stack.pop() {
+                    Some(StackValue::Reference(addr)) => addr,
+                    Some(_) => panic!("MemSet: Expected a reference on the stack"),
+                    None => panic!("Stack underflow in MemSet instruction"),
+                };
+
+                if addr == 0 {
+                    panic!("MemSet: Null pointer dereference");
+                }
+
+                // Setze den Speicherbereich (in einer Schleife)
+                for i in 0..count {
+                    match memory.write(addr + i, value) {
+                        Ok(_) => {},
+                        Err(e) => {
+                            panic!("MemSet: Memory error at offset {}: {}", i, e);
+                        }
+                    }
+                }
+
+                None
             }
         }
     }
@@ -640,7 +800,11 @@ impl InstructionExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::opcode::Opcode;
+    use crate::{
+        memory::SegmentedMemory,
+        opcode::Opcode,
+        stack::{Stack, StackValue},
+    };
 
     #[test]
     fn test_instruction_fetcher() {
@@ -686,5 +850,116 @@ mod tests {
         let instruction = decoder.decode(raw);
         assert_eq!(instruction.opcode, Opcode::Store);
         assert_eq!(instruction.operands, vec![0x2A0000]);
+    }
+    
+    #[test]
+    fn test_heap_operations() {
+        // Set up the executor and memory
+        let mut executor = InstructionExecutor::new();
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
+        let mut stack = Stack::new(100);
+        
+        // Test Alloc instruction
+        let alloc_instr = Instruction {
+            opcode: Opcode::Alloc,
+            operands: vec![10], // Allocate 10 words
+        };
+        
+        executor.execute(&alloc_instr, &mut stack, &mut memory);
+        
+        // Check if we have a reference on the stack
+        let addr = match stack.peek() {
+            Some(StackValue::Reference(addr)) => *addr,
+            _ => panic!("Expected a reference on the stack after allocation"),
+        };
+        
+        assert!(addr > 0, "Allocation should return a non-zero address");
+        
+        // Test MemSet instruction - first set up the stack with required values
+        // Stack needs: [reference, count, value]
+        stack.pop(); // Remove the reference
+        stack.push(StackValue::Reference(addr)); // Push it back
+        stack.push(StackValue::Integer(10)); // Size of allocated memory
+        stack.push(StackValue::Integer(42)); // Value to set
+        
+        let memset_instr = Instruction {
+            opcode: Opcode::MemSet,
+            operands: vec![],
+        };
+        
+        executor.execute(&memset_instr, &mut stack, &mut memory);
+        
+        // The stack should be empty after MemSet
+        assert_eq!(stack.len(), 0);
+        
+        // Test StoreHeap instruction - set up the stack with required values
+        // Stack needs: [reference, offset, value]
+        stack.push(StackValue::Reference(addr));
+        stack.push(StackValue::Integer(5)); // Offset 5
+        stack.push(StackValue::Integer(99)); // New value
+        
+        let store_heap_instr = Instruction {
+            opcode: Opcode::StoreHeap,
+            operands: vec![],
+        };
+        
+        executor.execute(&store_heap_instr, &mut stack, &mut memory);
+        
+        // The stack should be empty after StoreHeap
+        assert_eq!(stack.len(), 0);
+        
+        // Test LoadHeap instruction - first set up the stack with required values
+        // Stack needs: [reference, offset]
+        stack.push(StackValue::Reference(addr));
+        stack.push(StackValue::Integer(5)); // Offset 5
+        
+        let load_heap_instr = Instruction {
+            opcode: Opcode::LoadHeap,
+            operands: vec![],
+        };
+        
+        executor.execute(&load_heap_instr, &mut stack, &mut memory);
+        
+        // Check if we loaded the right value (99)
+        let loaded_value = match stack.peek() {
+            Some(StackValue::Integer(value)) => *value,
+            _ => panic!("Expected an integer on the stack after LoadHeap"),
+        };
+        
+        assert_eq!(loaded_value, 99, "Should have loaded value 99 from offset 5");
+        
+        // Test LoadHeap from another offset - should be 42 from MemSet
+        stack.pop(); // Remove the loaded value
+        stack.push(StackValue::Reference(addr));
+        stack.push(StackValue::Integer(3)); // Different offset
+        
+        executor.execute(&load_heap_instr, &mut stack, &mut memory);
+        
+        // Check if we loaded the right value (42 from MemSet)
+        let loaded_value = match stack.peek() {
+            Some(StackValue::Integer(value)) => *value,
+            _ => panic!("Expected an integer on the stack after LoadHeap"),
+        };
+        
+        assert_eq!(loaded_value, 42, "Should have loaded value 42 from offset 3");
+        
+        // Test Free instruction - first set up the stack with the reference
+        stack.clear();
+        stack.push(StackValue::Reference(addr));
+        
+        let free_instr = Instruction {
+            opcode: Opcode::Free,
+            operands: vec![],
+        };
+        
+        executor.execute(&free_instr, &mut stack, &mut memory);
+        
+        // Check if we got a success boolean
+        let success = match stack.peek() {
+            Some(StackValue::Boolean(success)) => *success,
+            _ => panic!("Expected a boolean on the stack after Free"),
+        };
+        
+        assert!(success, "Deallocation should succeed");
     }
 }
