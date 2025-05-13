@@ -168,6 +168,10 @@ pub struct Dup;
 #[opcode = 0x15]
 pub struct Swap;
 
+#[derive(IntoRaw)]
+#[opcode = 0x16]
+pub struct Drop;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,7 +223,15 @@ mod tests {
         assert_eq!(raw.opcode(), Opcode::Swap);
         assert!(!raw.has_operands());
     }
-    
+
+    #[test]
+    fn test_drop_instruction() {
+        let drop = Drop;
+        let raw = drop.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Drop);
+        assert!(!raw.has_operands());
+    }
+
     #[test]
     fn test_raw_instruction() {
         // Create a Store instruction (0x02) with operand 0x010203

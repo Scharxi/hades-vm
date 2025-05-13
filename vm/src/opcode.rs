@@ -22,6 +22,7 @@ pub enum Opcode {
     PickN = 0x13,
     Dup = 0x14,
     Swap = 0x15,
+    Drop = 0x16,
 }
 
 impl Opcode {
@@ -48,6 +49,7 @@ impl Opcode {
             Opcode::PickN => 1,
             Opcode::Dup => 0,
             Opcode::Swap => 0,
+            Opcode::Drop => 0,
         }
     }
 }

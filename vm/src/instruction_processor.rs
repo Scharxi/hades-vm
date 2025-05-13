@@ -624,6 +624,14 @@ impl InstructionExecutor {
                 stack.push(a);
                 stack.push(b);
                 None
+            },
+            Opcode::Drop => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Drop instruction requires 0 operands");
+                }
+
+                stack.pop();
+                None
             }
         }
     }
