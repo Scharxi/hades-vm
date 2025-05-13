@@ -21,6 +21,7 @@ pub enum Opcode {
     Power = 0x12,
     PickN = 0x13,
     Dup = 0x14,
+    Swap = 0x15,
 }
 
 impl Opcode {
@@ -46,6 +47,7 @@ impl Opcode {
             Opcode::Power => 0,
             Opcode::PickN => 1,
             Opcode::Dup => 0,
+            Opcode::Swap => 0,
         }
     }
 }

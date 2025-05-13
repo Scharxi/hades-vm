@@ -164,6 +164,10 @@ pub struct PickN(pub i32);
 #[opcode = 0x14]
 pub struct Dup;
 
+#[derive(IntoRaw)]
+#[opcode = 0x15]
+pub struct Swap;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,6 +212,14 @@ mod tests {
         assert!(!raw.has_operands());
     }
 
+    #[test]
+    fn test_swap_instruction() {
+        let swap = Swap;
+        let raw = swap.into_raw();
+        assert_eq!(raw.opcode(), Opcode::Swap);
+        assert!(!raw.has_operands());
+    }
+    
     #[test]
     fn test_raw_instruction() {
         // Create a Store instruction (0x02) with operand 0x010203

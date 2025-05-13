@@ -614,6 +614,17 @@ impl InstructionExecutor {
                 stack.push(*value);
                 None
             }
+            Opcode::Swap => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Swap instruction requires 0 operands");
+                }
+
+                let a = stack.pop().expect("Stack underflow");
+                let b = stack.pop().expect("Stack underflow");
+                stack.push(a);
+                stack.push(b);
+                None
+            }
         }
     }
 }

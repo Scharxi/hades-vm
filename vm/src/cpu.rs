@@ -238,5 +238,24 @@ mod tests {
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
         assert_eq!(cpu.stack.len(), 2);
+        }
+
+    #[test]
+    fn test_cpu_execution_with_swap() {
+        let program = vec![
+            0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
+            0x00, 0x00, 0x04, 0x04, // LoadConstant (opcode 4) with operand 4
+            0x00, 0x00, 0x00, 0x15, // Swap (opcode 21)
+        ];
+
+        let mut cpu = CPU::new(1000);
+        cpu.load_program(&program);
+        
+        assert!(cpu.step()); // LoadConstant 3
+        assert!(cpu.step()); // LoadConstant 4
+        assert!(cpu.step()); // Swap - Need to execute this step to perform the swap
+        
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
+        assert_eq!(cpu.stack.len(), 2);
     }
 } 
