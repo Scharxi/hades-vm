@@ -1,16 +1,31 @@
+//! # Memory Management Module
+//! 
+//! This module provides a flexible memory management system for the Hades VM.
+//! It implements a segmented memory architecture with different memory regions,
+//! each with specific access permissions. This design allows for memory 
+//! protection and isolation between different parts of the VM.
+
 use core::fmt;
 use std::{collections::HashMap, ops::Range};
 
-
-/// Typen von Speicherregionen, die in der VM unterstützt werden
+/// Represents different types of memory regions supported by the VM.
+/// 
+/// Each region type has a specific purpose and typically different access permissions.
+/// The VM uses these regions to organize memory according to its intended use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MemoryRegionType {
-    Code,       // Für Programmcode/Instruktionen
-    Data,       // Für statische Daten
-    Stack,      // Für den Aufrufstack
-    Heap,       // Für dynamisch allozierte Daten
-    IO,         // Für memory-mapped I/O
-    Constants,  // Für Konstanten (schreibgeschützt)
+    /// Program code and instructions
+    Code,
+    /// Static/global data
+    Data,
+    /// Call and execution stack
+    Stack,
+    /// Dynamically allocated memory
+    Heap,
+    /// Memory-mapped I/O for device interaction
+    IO,
+    /// Read-only constants
+    Constants,
 }
 
 impl fmt::Display for MemoryRegionType {
@@ -26,25 +41,53 @@ impl fmt::Display for MemoryRegionType {
     }
 }
 
-/// Zugriffsrechte für Speicherregionen
+/// Access permissions that can be applied to memory regions.
+/// 
+/// These permissions control what operations are allowed on a specific region,
+/// providing memory protection and preventing unauthorized access.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AccessPermission {
+    /// Permission to read from memory
     Read,
+    /// Permission to write to memory
     Write,
+    /// Permission to execute code from memory
     Execute,
 }
 
-/// Repräsentiert eine zusammenhängende Region im Speicher
+/// Represents a contiguous region in memory with specific properties.
+/// 
+/// A MemoryRegion defines a section of memory with a specific type, size,
+/// starting address, and access permissions. Regions are used to organize
+/// the VM's memory space according to different usage patterns.
 #[derive(Debug, Clone)]
 pub struct MemoryRegion {
+    /// The type of this memory region
     pub region_type: MemoryRegionType,
-    pub start: usize,               // Startadresse
-    pub size: usize,                // Größe in Elementen
-    pub permissions: Vec<AccessPermission>, // Zugriffsrechte
-    pub description: String,        // Optionale Beschreibung
+    /// Starting address of the region
+    pub start: usize,
+    /// Size of the region in elements (words)
+    pub size: usize,
+    /// Access permissions for this region
+    pub permissions: Vec<AccessPermission>,
+    /// Human-readable description of the region
+    pub description: String,
 }
 
 impl MemoryRegion {
+    /// Creates a new memory region with the specified parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `region_type` - The type of memory region
+    /// * `start` - Starting address of the region
+    /// * `size` - Size of the region in elements (words)
+    /// * `permissions` - Vector of access permissions for this region
+    /// * `description` - Optional human-readable description (defaults to region type name)
+    ///
+    /// # Returns
+    ///
+    /// A new `MemoryRegion` instance
     pub fn new(
         region_type: MemoryRegionType,
         start: usize,
@@ -61,22 +104,50 @@ impl MemoryRegion {
         }
     }
     
-    /// Gibt den Adressbereich der Region zurück
+    /// Returns the address range covered by this region.
+    ///
+    /// # Returns
+    ///
+    /// A Range from the start address (inclusive) to the end address (exclusive)
     pub fn address_range(&self) -> Range<usize> {
         self.start..(self.start + self.size)
     }
     
-    /// Prüft, ob eine Adresse in dieser Region liegt
+    /// Checks if a given address falls within this region.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The address to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if the address is within this region, `false` otherwise
     pub fn contains_address(&self, address: usize) -> bool {
         self.address_range().contains(&address)
     }
     
-    /// Prüft, ob eine Zugriffsberechtigung besteht
+    /// Checks if this region has a specific access permission.
+    ///
+    /// # Arguments
+    ///
+    /// * `permission` - The permission to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if the region has the specified permission, `false` otherwise
     pub fn has_permission(&self, permission: AccessPermission) -> bool {
         self.permissions.contains(&permission)
     }
     
-    /// Konvertiert eine globale Adresse in einen regionslokalen Offset
+    /// Converts a global memory address to a region-local offset.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The global address to convert
+    ///
+    /// # Returns
+    ///
+    /// `Some(offset)` if the address is within this region, `None` otherwise
     pub fn address_to_offset(&self, address: usize) -> Option<usize> {
         if self.contains_address(address) {
             Some(address - self.start)
@@ -85,7 +156,15 @@ impl MemoryRegion {
         }
     }
     
-    /// Konvertiert einen regionslokalen Offset in eine globale Adresse
+    /// Converts a region-local offset to a global memory address.
+    ///
+    /// # Arguments
+    ///
+    /// * `offset` - The region-local offset to convert
+    ///
+    /// # Returns
+    ///
+    /// `Some(address)` if the offset is valid for this region, `None` otherwise
     pub fn offset_to_address(&self, offset: usize) -> Option<usize> {
         if offset < self.size {
             Some(self.start + offset)
@@ -95,15 +174,30 @@ impl MemoryRegion {
     }
 }
 
-/// Speicher mit definierten Regionen für strukturierten Zugriff
+/// Memory with defined regions for structured access and memory protection.
+///
+/// SegmentedMemory implements a memory model with distinct regions, each
+/// having specific access permissions. This structure enables memory protection
+/// and structured memory access patterns for the VM.
 pub struct SegmentedMemory {
-    data: Vec<i32>,                                // Unterlegende Speicherdaten
-    regions: HashMap<MemoryRegionType, MemoryRegion>, // Region-Definitionen
-    region_map: Vec<Option<MemoryRegionType>>,     // Lookup-Tabelle für Adressen
+    /// The actual memory storage (array of i32 values)
+    data: Vec<i32>,
+    /// Mapping from region types to region definitions
+    regions: HashMap<MemoryRegionType, MemoryRegion>,
+    /// Lookup table for quick address-to-region resolution
+    region_map: Vec<Option<MemoryRegionType>>,
 }
 
 impl SegmentedMemory {
-    /// Erstellt einen neuen segmentierten Speicher
+    /// Creates a new segmented memory with the specified size.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_size` - The initial size of the memory in words
+    ///
+    /// # Returns
+    ///
+    /// A new `SegmentedMemory` instance with no defined regions
     pub fn new(initial_size: usize) -> Self {
         Self {
             data: vec![0; initial_size],
@@ -112,7 +206,19 @@ impl SegmentedMemory {
         }
     }
     
-    /// Definiert eine neue Speicherregion
+    /// Defines a new memory region within this memory.
+    ///
+    /// This method adds a new region to the memory, ensuring it doesn't
+    /// overlap with existing regions and fits within the memory size.
+    ///
+    /// # Arguments
+    ///
+    /// * `region` - The memory region to define
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if the region was successfully defined, `Err` with a
+    /// description of the issue otherwise
     pub fn define_region(&mut self, region: MemoryRegion) -> Result<(), String> {
         // Prüfen, ob die Region in den Speicher passt
         let end = region.start + region.size;
@@ -146,7 +252,17 @@ impl SegmentedMemory {
         Ok(())
     }
     
-    /// Liest einen Wert aus einer bestimmten Region (per Offset)
+    /// Reads a value from a specific region using an offset.
+    ///
+    /// # Arguments
+    ///
+    /// * `region_type` - The type of region to read from
+    /// * `offset` - The offset within the region
+    ///
+    /// # Returns
+    ///
+    /// `Ok(value)` if the read was successful, `Err` with a
+    /// description of the issue otherwise
     pub fn read_from_region(
         &self, 
         region_type: MemoryRegionType, 
@@ -167,7 +283,18 @@ impl SegmentedMemory {
         Ok(self.data[address])
     }
     
-    /// Schreibt einen Wert in eine bestimmte Region (per Offset)
+    /// Writes a value to a specific region using an offset.
+    ///
+    /// # Arguments
+    ///
+    /// * `region_type` - The type of region to write to
+    /// * `offset` - The offset within the region
+    /// * `value` - The value to write
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if the write was successful, `Err` with a
+    /// description of the issue otherwise
     pub fn write_to_region(
         &mut self, 
         region_type: MemoryRegionType, 
@@ -190,7 +317,18 @@ impl SegmentedMemory {
         Ok(())
     }
     
-    /// Liest einen Wert aus einer absoluten Adresse
+    /// Reads a value from an absolute memory address.
+    ///
+    /// This method respects memory regions and their access permissions.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The absolute address to read from
+    ///
+    /// # Returns
+    ///
+    /// `Ok(value)` if the read was successful, `Err` with a
+    /// description of the issue otherwise
     pub fn read(&self, address: usize) -> Result<i32, String> {
         // Prüfen, ob die Adresse gültig ist
         if address >= self.data.len() {
@@ -212,7 +350,19 @@ impl SegmentedMemory {
         Ok(self.data[address])
     }
     
-    /// Schreibt einen Wert an eine absolute Adresse
+    /// Writes a value to an absolute memory address.
+    ///
+    /// This method respects memory regions and their access permissions.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The absolute address to write to
+    /// * `value` - The value to write
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if the write was successful, `Err` with a
+    /// description of the issue otherwise
     pub fn write(&mut self, address: usize, value: i32) -> Result<(), String> {
         // Prüfen, ob die Adresse gültig ist
         if address >= self.data.len() {
@@ -235,7 +385,19 @@ impl SegmentedMemory {
         Ok(())
     }
     
-    /// Führt Code an einer Adresse aus
+    /// Executes code at a specific memory address.
+    ///
+    /// This method checks if the memory at the given address
+    /// is executable and returns the instruction value if it is.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The absolute address to execute from
+    ///
+    /// # Returns
+    ///
+    /// `Ok(instruction)` if executable, `Err` with a
+    /// description of the issue otherwise
     pub fn execute(&self, address: usize) -> Result<i32, String> {
         // Prüfen, ob die Adresse gültig ist
         if address >= self.data.len() {
@@ -257,13 +419,30 @@ impl SegmentedMemory {
         Ok(self.data[address])
     }
     
-    /// Hilfsmethode: Region abrufen
+    /// Helper method to get a region by its type.
+    ///
+    /// # Arguments
+    ///
+    /// * `region_type` - The type of region to retrieve
+    ///
+    /// # Returns
+    ///
+    /// `Ok(region)` if the region exists, `Err` with a
+    /// description of the issue otherwise
     fn get_region(&self, region_type: MemoryRegionType) -> Result<&MemoryRegion, String> {
         self.regions.get(&region_type)
             .ok_or_else(|| format!("Region {} is not defined", region_type))
     }
     
-    /// Gibt Informationen zur Speicheraufteilung zurück
+    /// Returns a string representation of the memory map.
+    ///
+    /// This method generates a human-readable description of all defined
+    /// memory regions, including their addresses, sizes, permissions,
+    /// and descriptions.
+    ///
+    /// # Returns
+    ///
+    /// A formatted string describing the memory map
     pub fn memory_map(&self) -> String {
         let mut result = String::new();
         result.push_str("Memory Map:\n");
@@ -294,12 +473,27 @@ impl SegmentedMemory {
         result
     }
     
-    /// Gibt die Größe des Speichers zurück
+    /// Returns the total size of the memory in words.
+    ///
+    /// # Returns
+    ///
+    /// The size of the memory
     pub fn size(&self) -> usize {
         self.data.len()
     }
     
-    /// Erweitert den Speicher auf die angegebene Größe
+    /// Resizes the memory to a new size.
+    ///
+    /// This method can only increase the memory size, not decrease it.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_size` - The new size for the memory
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if resizing was successful, `Err` with a
+    /// description of the issue otherwise
     pub fn resize(&mut self, new_size: usize) -> Result<(), String> {
         if new_size < self.data.len() {
             return Err("Cannot shrink memory below current size".to_string());
@@ -313,7 +507,23 @@ impl SegmentedMemory {
 
 
 impl SegmentedMemory {
-    /// Erstellt ein Standard-Speicherlayout für eine einfache VM
+    /// Creates a standard memory layout for a general-purpose VM.
+    ///
+    /// This layout divides memory into the following regions:
+    /// - Code (20%): For program instructions (Read + Execute)
+    /// - Constants (10%): For read-only data (Read only)
+    /// - Data (20%): For global variables (Read + Write)
+    /// - Stack (25%): For call stack and local variables (Read + Write)
+    /// - Heap (remainder): For dynamic allocations (Read + Write)
+    ///
+    /// # Arguments
+    ///
+    /// * `memory_size` - The total size of memory to allocate
+    ///
+    /// # Returns
+    ///
+    /// `Ok(memory)` with the configured memory layout, or `Err` with a 
+    /// description if the memory size is too small
     pub fn create_standard_layout(memory_size: usize) -> Result<Self, String> {
         if memory_size < 1024 {
             return Err("Memory size too small for standard layout".to_string());
@@ -375,7 +585,21 @@ impl SegmentedMemory {
         Ok(memory)
     }
     
-    /// Erstellt ein Speicherlayout für eine eingebettete VM
+    /// Creates a memory layout optimized for embedded systems.
+    ///
+    /// This layout is designed to mimic constraints of embedded hardware:
+    /// - Flash memory (50%): Split between Code and Constants
+    /// - RAM (40%): Split between Data and Stack
+    /// - I/O (10%): For memory-mapped peripheral access
+    ///
+    /// # Arguments
+    ///
+    /// * `memory_size` - The total size of memory to allocate
+    ///
+    /// # Returns
+    ///
+    /// `Ok(memory)` with the configured embedded layout, or `Err` with a 
+    /// description if the memory size is too small
     pub fn create_embedded_layout(memory_size: usize) -> Result<Self, String> {
         if memory_size < 512 {
             return Err("Memory size too small for embedded layout".to_string());
@@ -432,11 +656,28 @@ impl SegmentedMemory {
         Ok(memory)
     }
 
+    /// Prints the memory map to standard output.
+    ///
+    /// This is a convenience method for debugging and displaying
+    /// the current memory configuration.
     pub fn print_memory_map(&self) {
         println!("{}", self.memory_map());
     }
 
-    /// Erstellt ein Speicherlayout für Tests, bei dem alle Regionen alle Zugriffsrechte haben
+    /// Creates a memory layout specifically for testing purposes.
+    ///
+    /// This layout uses the same proportions as the standard layout,
+    /// but grants all access permissions (Read, Write, Execute) to all
+    /// regions, making it easier to use in tests without permission errors.
+    ///
+    /// # Arguments
+    ///
+    /// * `memory_size` - The total size of memory to allocate
+    ///
+    /// # Returns
+    ///
+    /// `Ok(memory)` with the configured test layout, or `Err` with a 
+    /// description if the memory size is too small
     pub fn create_test_layout(memory_size: usize) -> Result<Self, String> {
         if memory_size < 512 {
             return Err("Memory size too small for test layout".to_string());
