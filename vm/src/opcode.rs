@@ -11,8 +11,8 @@ pub enum Opcode {
     StoreMemory = 0x8,
     JumpIfZero = 0x9,
     Divide = 0xA,
-    LoadFromRegion,
-    StoreToRegion,
+    LoadFromRegion = 0xB,
+    StoreToRegion = 0xC,
 }
 
 impl Opcode {
@@ -71,6 +71,9 @@ impl OpcodeMapping for Opcode {
             "LoadMemory" => Some(Opcode::LoadMemory as u8),
             "StoreMemory" => Some(Opcode::StoreMemory as u8),
             "JumpIfZero" => Some(Opcode::JumpIfZero as u8),
+            "Divide" => Some(Opcode::Divide as u8),
+            "LoadFromRegion" => Some(Opcode::LoadFromRegion as u8),
+            "StoreToRegion" => Some(Opcode::StoreToRegion as u8),
             _ => None,
         }
     }

@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, io::{stdout, Stdout, Write}};
 
-use crate::{instruction::{Instruction, RawInstruction}, memory::{MemoryRegionType, SegmentedMemory}, opcode::Opcode};
+use crate::{instruction::{Instruction, RawInstruction, IntoRaw}, memory::{MemoryRegionType, SegmentedMemory, AccessPermission}, opcode::Opcode};
 
 pub struct CPU {
     fetcher: InstructionFetcher, 
@@ -78,7 +78,36 @@ impl CPU {
     }
 
     pub fn load_program(&mut self, program: &[u8]) {
+        // Programm in den Speicher in die Code-Region laden
+        self.load_program_to_memory(program);
+        
+        // Anschließend den InstructionFetcher mit dem Programm initialisieren
         self.fetcher.load_program(program);
+    }
+    
+    /// Lädt das Programm in die Code-Region des Speichers
+    fn load_program_to_memory(&mut self, program: &[u8]) {
+        // Stellen Sie sicher, dass die Byte-Länge ein Vielfaches von 4 ist
+        if program.len() % 4 != 0 {
+            panic!("Program length must be a multiple of 4 bytes");
+        }
+        
+        // Wandeln Sie das Byte-Array in 32-Bit-Instruktionen um und schreiben Sie sie in die Code-Region
+        for (i, chunk) in program.chunks(4).enumerate() {
+            if chunk.len() == 4 {
+                let raw_instr = RawInstruction::from_bytes(chunk[0], chunk[1], chunk[2], chunk[3]);
+                let value = raw_instr.as_i32();
+                
+                // Schreiben Sie in die Code-Region mit dem entsprechenden Offset
+                if let Err(e) = self.memory.write_to_region(MemoryRegionType::Code, i, value) {
+                    // Falls Code-Region nicht beschreibbar ist (z.B. im Standard-Layout),
+                    // versuchen wir direkt in den Speicher zu schreiben
+                    if let Err(e2) = self.memory.write(i, value) {
+                        panic!("Failed to load program to memory: {} and fallback failed: {}", e, e2);
+                    }
+                }
+            }
+        }
     }
 
     pub fn step(&mut self) -> bool {
@@ -435,6 +464,11 @@ impl VirtualMachine {
     
     pub fn stack_top(&self) -> Option<i32> {
         self.cpu.stack.back().copied()
+    }
+    
+    /// Gibt eine Debugansicht des Speichers aus
+    pub fn print_memory_map(&self) {
+        self.cpu.memory.print_memory_map();
     }
 }
 

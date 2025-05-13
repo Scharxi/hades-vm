@@ -139,6 +139,14 @@ pub struct JumpIfZero(pub i32);
 #[opcode = 0x0A]
 pub struct Divide;
 
+// Neue Instruktionstypen für Speicherregionszugriff
+#[derive(IntoRaw)]
+#[opcode = 0x0B]
+pub struct LoadFromRegion(pub i32, pub i32); // Region-ID, Offset
+
+#[derive(IntoRaw)]
+#[opcode = 0x0C]
+pub struct StoreToRegion(pub i32, pub i32); // Region-ID, Offset
 
 #[cfg(test)]
 mod tests {
