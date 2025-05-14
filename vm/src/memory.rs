@@ -933,6 +933,174 @@ impl SegmentedMemory {
         // Block not found or not allocated
         false
     }
+
+    /// Coalesces adjacent free blocks in the heap to reduce fragmentation.
+    /// This method scans the heap's allocation bitmap for adjacent free blocks
+    /// and merges them into larger blocks to reduce memory fragmentation.
+    ///
+    /// # Returns
+    ///
+    /// The number of blocks that were merged
+    pub fn coalesce_free_blocks(&mut self) -> usize {
+        // Get the heap region
+        let heap_region = match self.regions.get(&MemoryRegionType::Heap) {
+            Some(region) => region,
+            None => return 0, // No heap region defined
+        };
+        
+        let heap_start = heap_region.start;
+        
+        // Check if the allocation bitmap is initialized
+        const ALLOC_MARKER: i32 = 0xA110C;
+        let bitmap_initialized = match self.read_direct(heap_start) {
+            Ok(marker) => marker == ALLOC_MARKER,
+            Err(_) => false,
+        };
+        
+        if !bitmap_initialized {
+            return 0; // Bitmap not initialized, nothing to coalesce
+        }
+        
+        // Read the number of blocks
+        let mut block_count = match self.read_direct(heap_start + 1) {
+            Ok(count) => count as usize,
+            Err(_) => return 0,
+        };
+        
+        if block_count <= 1 {
+            return 0; // Nothing to coalesce
+        }
+        
+        const BITMAP_HEADER_SIZE: usize = 2;
+        const BLOCK_ENTRY_SIZE: usize = 3;
+        
+        // First, collect all blocks into a Vec for sorting and processing
+        let mut blocks = Vec::with_capacity(block_count);
+        
+        for i in 0..block_count {
+            let block_entry_offset = BITMAP_HEADER_SIZE + i * BLOCK_ENTRY_SIZE;
+            
+            // Read block information
+            let block_addr = match self.read_direct(heap_start + block_entry_offset) {
+                Ok(addr) => addr as usize,
+                Err(_) => continue,
+            };
+            
+            let block_size = match self.read_direct(heap_start + block_entry_offset + 1) {
+                Ok(size) => size as usize,
+                Err(_) => continue,
+            };
+            
+            let is_allocated = match self.read_direct(heap_start + block_entry_offset + 2) {
+                Ok(flag) => flag != 0,
+                Err(_) => continue,
+            };
+            
+            blocks.push((i, block_addr, block_size, is_allocated));
+        }
+        
+        // Sort blocks by address
+        blocks.sort_by_key(|&(_, addr, _, _)| addr);
+        
+        // Identify blocks to merge and update the bitmap
+        let mut merges_performed = 0;
+        let mut i = 0;
+        
+        while i < blocks.len() - 1 {
+            let (idx1, addr1, size1, allocated1) = blocks[i];
+            let (idx2, addr2, size2, allocated2) = blocks[i + 1];
+            
+            // Check if blocks are adjacent and both are free
+            if !allocated1 && !allocated2 && addr1 + size1 == addr2 {
+                // Merge blocks by updating the first block's size
+                let new_size = size1 + size2;
+                let block1_offset = BITMAP_HEADER_SIZE + idx1 * BLOCK_ENTRY_SIZE;
+                
+                if let Err(_) = self.write_direct(heap_start + block1_offset + 1, new_size as i32) {
+                    i += 1;
+                    continue;
+                }
+                
+                // Mark the second block as a special "merged" state (-1)
+                let block2_offset = BITMAP_HEADER_SIZE + idx2 * BLOCK_ENTRY_SIZE;
+                if let Err(_) = self.write_direct(heap_start + block2_offset + 2, -1) {
+                    i += 1;
+                    continue;
+                }
+                
+                // Update our local tracking for continued processing
+                blocks[i].2 = new_size;
+                blocks[i + 1].3 = true; // Mark as "processed"
+                
+                merges_performed += 1;
+            }
+            
+            i += 1;
+        }
+        
+        // If we performed any merges, compact the block list
+        if merges_performed > 0 {
+            // Remove merged blocks from the bitmap
+            let mut new_block_count = 0;
+            let mut write_idx = 0;
+            
+            for i in 0..block_count {
+                let block_entry_offset = BITMAP_HEADER_SIZE + i * BLOCK_ENTRY_SIZE;
+                
+                // Check if this block was merged (marked with -1)
+                let merged = match self.read_direct(heap_start + block_entry_offset + 2) {
+                    Ok(flag) => flag == -1,
+                    Err(_) => false,
+                };
+                
+                if !merged {
+                    // If this isn't a merged block, keep it
+                    if write_idx != i {
+                        // Only copy if the positions differ
+                        let addr = match self.read_direct(heap_start + block_entry_offset) {
+                            Ok(addr) => addr,
+                            Err(_) => continue,
+                        };
+                        
+                        let size = match self.read_direct(heap_start + block_entry_offset + 1) {
+                            Ok(size) => size,
+                            Err(_) => continue,
+                        };
+                        
+                        let allocated = match self.read_direct(heap_start + block_entry_offset + 2) {
+                            Ok(flag) => flag,
+                            Err(_) => continue,
+                        };
+                        
+                        let write_offset = BITMAP_HEADER_SIZE + write_idx * BLOCK_ENTRY_SIZE;
+                        
+                        if let Err(_) = self.write_direct(heap_start + write_offset, addr) {
+                            continue;
+                        }
+                        
+                        if let Err(_) = self.write_direct(heap_start + write_offset + 1, size) {
+                            continue;
+                        }
+                        
+                        if let Err(_) = self.write_direct(heap_start + write_offset + 2, allocated) {
+                            continue;
+                        }
+                    }
+                    
+                    write_idx += 1;
+                    new_block_count += 1;
+                }
+            }
+            
+            // Update the block count
+            if let Err(_) = self.write_direct(heap_start + 1, new_block_count as i32) {
+                // If we can't update the count, the coalescing might be partially effective
+                // but future operations might be affected
+            }
+        }
+        
+        merges_performed
+    }
 }
 
 impl SegmentedMemory {
@@ -1347,5 +1515,52 @@ mod tests {
         // Try accessing an unallocated address (should fail)
         let unallocated = memory.read(addr1);
         assert!(unallocated.is_err());
+    }
+
+    #[test]
+    fn test_memory_coalescing() {
+        // Create a memory with a test layout
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
+        
+        // Allocate several blocks
+        let addr1 = memory.allocate(20).unwrap();
+        let addr2 = memory.allocate(30).unwrap();
+        let addr3 = memory.allocate(15).unwrap();
+        let addr4 = memory.allocate(25).unwrap();
+        
+        // Free blocks in a way that creates adjacent free blocks
+        assert!(memory.deallocate(addr1));
+        assert!(memory.deallocate(addr2)); // This should create two adjacent free blocks (addr1 and addr2)
+        assert!(memory.deallocate(addr4)); // This will be another free block, but not adjacent
+        
+        // Keep addr3 allocated to create fragmentation
+        
+        // Count number of free blocks before coalescing
+        // We'll do this by trying to scan the heap's bitmap directly
+        let heap_region = memory.regions.get(&MemoryRegionType::Heap).unwrap().clone();
+        let heap_start = heap_region.start;
+        
+        const BITMAP_HEADER_SIZE: usize = 2;
+        
+        let block_count_before = memory.read_direct(heap_start + 1).unwrap() as usize;
+        
+        // Coalesce free blocks
+        let merges = memory.coalesce_free_blocks();
+        
+        // At least one merge should have happened
+        assert!(merges > 0, "Expected at least one merge to occur");
+        
+        // Check the block count decreased
+        let block_count_after = memory.read_direct(heap_start + 1).unwrap() as usize;
+        assert!(block_count_after < block_count_before, 
+                "Block count should decrease: before={}, after={}", 
+                block_count_before, block_count_after);
+        
+        // Ensure we can still allocate memory that fits in the coalesced block
+        let new_addr = memory.allocate(45).unwrap(); // This should fit in the coalesced block of addr1+addr2
+        
+        // The allocation should succeed and the memory should be usable
+        memory.write(new_addr, 42).unwrap();
+        assert_eq!(memory.read(new_addr).unwrap(), 42);
     }
 }
