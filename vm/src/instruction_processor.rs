@@ -8,9 +8,41 @@ use crate::{
     alu::ALU,
     instruction::{Instruction, RawInstruction},
     memory::{MemoryRegionType, SegmentedMemory},
-    opcode::Opcode,
+    opcode::{Opcode, InvalidOpcodeError},
     stack::{Stack, StackFrame, StackValue},
 };
+
+/// Signal, das von der `execute`-Methode zurückgegeben wird, um den VM-Zyklus zu steuern.
+#[derive(Debug, PartialEq)]
+pub enum ExecutionSignal {
+    /// Die Ausführung soll mit der nächsten Instruktion fortgesetzt werden.
+    Continue,
+    /// Ein Sprung zu einer bestimmten Speicheradresse ist erforderlich.
+    Jump(usize),
+    /// Der aktuelle Prozess gibt die Kontrolle frei (Kontextwechsel).
+    Yield,
+    /// Der aktuelle Prozess soll beendet werden.
+    Terminate,
+    // Hier könnten weitere Signale für Systemaufrufe, Fehlerbehandlung etc. folgen.
+}
+
+/// Mögliche Zustände eines Prozesses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessState {
+    Ready,     // Bereit zur Ausführung
+    Running,   // Wird aktuell ausgeführt
+    Blocked,   // Wartet auf ein Ereignis (z.B. I/O)
+    Terminated, // Prozess wurde beendet
+}
+
+/// Process Control Block (PCB) zur Speicherung des Zustands eines Prozesses.
+pub struct ProcessControlBlock {
+    pub pid: u32,                      // Eindeutige Prozess-ID
+    pub pc: usize,                     // Program Counter des Prozesses
+    pub stack: Stack,                  // Der Stack des Prozesses
+    pub state: ProcessState,           // Aktueller Zustand des Prozesses
+    // Optional: memory_context: Für komplexeres Speichermanagement pro Prozess
+}
 
 /// Fetches instructions from the program.
 ///
@@ -19,70 +51,89 @@ use crate::{
 pub struct InstructionFetcher {
     /// Current program counter (position in program)
     pub pc: usize,
-    /// Program data as a byte array
-    pub program: Vec<u8>,
+    // Program data as a byte array - REMOVED
+    // pub program: Vec<u8>,
 }
 
 impl InstructionFetcher {
     /// Creates a new InstructionFetcher with an empty program.
     pub fn new() -> Self {
         Self {
-            program: vec![],
+            // program: vec![], // REMOVED
             pc: 0,
         }
     }
 
-    /// Loads a new program and resets the program counter.
-    pub fn load_program(&mut self, program: &[u8]) {
-        self.program = program.to_vec();
-        self.pc = 0;
-    }
+    // Loads a new program and resets the program counter. - REMOVED
+    // pub fn load_program(&mut self, program: &[u8]) {
+    //     self.program = program.to_vec();
+    //     self.pc = 0;
+    // }
 
     /// Peeks at the next instruction without advancing the program counter.
-    pub fn peek_next(&self) -> Option<RawInstruction> {
-        if self.pc + 3 < self.program.len() {
-            let b0 = self.program[self.pc];
-            let b1 = self.program[self.pc + 1];
-            let b2 = self.program[self.pc + 2];
-            let b3 = self.program[self.pc + 3];
+    /// TODO: This needs to be properly refactored to use SegmentedMemory as well.
+    /// For now, returning None to avoid issues with removed self.program.
+    pub fn peek_next(&self, _memory: &SegmentedMemory) -> Option<RawInstruction> {
+        // if self.pc + 3 < self.program.len() {
+        //     let b0 = self.program[self.pc];
+        //     let b1 = self.program[self.pc + 1];
+        //     let b2 = self.program[self.pc + 2];
+        //     let b3 = self.program[self.pc + 3];
 
-            Some(RawInstruction::from_bytes(b0, b1, b2, b3))
-        } else {
-            None
-        }
+        //     Some(RawInstruction::from_bytes(b0, b1, b2, b3))
+        // } else {
+        //     None
+        // }
+        None // Temporary fix
     }
 
     /// Fetches the next instruction and advances the program counter.
-    pub fn fetch(&mut self) -> Option<RawInstruction> {
-        // Ensure we have at least 4 bytes to read
-        if self.pc + 3 < self.program.len() {
-            // Read 4 bytes and combine them into a 32-bit instruction
-            let b0 = self.program[self.pc];
-            let b1 = self.program[self.pc + 1];
-            let b2 = self.program[self.pc + 2];
-            let b3 = self.program[self.pc + 3];
+    pub fn fetch(&mut self, memory: &SegmentedMemory) -> Option<RawInstruction> {
+        // Ensure PC is 4-byte aligned for word addressing, though set_pc should ensure this.
+        if self.pc % 4 != 0 {
+            // This case should ideally not be hit if set_pc is used correctly.
+            return None;
+        }
+        let word_address = self.pc / 4;
 
-            // Combine bytes into a 32-bit instruction (big endian)
-            let instruction = RawInstruction::from_bytes(b0, b1, b2, b3);
-
-            // Increment program counter by 4 bytes
-            self.pc += 4;
-
-            Some(instruction)
-        } else {
-            None
+        match memory.read(word_address) {
+            Ok(instr_val_i32) => {
+                // Assuming instructions are stored big-endian in memory,
+                // matching RawInstruction::from_bytes behavior if it assumes MSB first.
+                // And RawInstruction::as_i32() also implies a consistent endianness.
+                let bytes = instr_val_i32.to_be_bytes();
+                let raw_instr = RawInstruction::from_bytes(bytes[0], bytes[1], bytes[2], bytes[3]);
+                self.pc += 4;
+                Some(raw_instr)
+            }
+            Err(_) => {
+                // Could be out of bounds, a protection fault, or uninitialized memory.
+                // For fetching, any error means we can't get an instruction.
+                None
+            }
         }
     }
 
     /// Sets the program counter to a new address.
     pub fn set_pc(&mut self, address: usize) {
         if address % 4 != 0 {
-            panic!("Program counter must be aligned to 4 bytes");
+            panic!("Program counter must be aligned to 4 bytes. PC: {}", address);
         }
-        if address >= self.program.len() {
-            panic!("Program counter out of bounds");
-        }
+        // Bounds checking is effectively deferred to `fetch` when it tries to read from memory.
         self.pc = address;
+    }
+}
+
+/// Error type for instruction decoding failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecodeError {
+    InvalidOpcode(InvalidOpcodeError),
+    // Potentially other decode errors in the future
+}
+
+impl From<InvalidOpcodeError> for DecodeError {
+    fn from(err: InvalidOpcodeError) -> Self {
+        DecodeError::InvalidOpcode(err)
     }
 }
 
@@ -94,13 +145,9 @@ pub struct InstructionDecoder;
 
 impl InstructionDecoder {
     /// Decodes a raw instruction into an executable instruction.
-    pub fn decode(&self, instruction: RawInstruction) -> Instruction {
-        // the last 8 bits are the opcode
-        let opcode = instruction.opcode();
-        let operands = instruction.get_operands();
-
-        // Extract operands based on the opcode's operand count
-        Instruction { opcode, operands }
+    pub fn decode(&self, instruction_raw: RawInstruction) -> Result<Instruction, DecodeError> {
+        // RawInstruction::try_into() handles opcode validation and operand extraction.
+        Instruction::try_from(instruction_raw).map_err(DecodeError::from)
     }
 }
 
@@ -138,7 +185,8 @@ impl InstructionExecutor {
         instruction: &Instruction,
         stack: &mut Stack,
         memory: &mut SegmentedMemory,
-    ) -> Option<usize> {
+        current_pc_of_instruction: usize,
+    ) -> ExecutionSignal {
         match instruction.opcode {
             Opcode::Add => {
                 if instruction.opcode.operand_count() > 0 {
@@ -163,7 +211,7 @@ impl InstructionExecutor {
                 } else {
                     panic!("Stack underflow");
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Store => {
                 if instruction.opcode.operand_count() != 1 {
@@ -174,7 +222,7 @@ impl InstructionExecutor {
 
                 // push the value to the stack as Integer
                 stack.push(StackValue::Integer(value));
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Sub => {
                 if instruction.opcode.operand_count() > 0 {
@@ -200,7 +248,7 @@ impl InstructionExecutor {
                 } else {
                     panic!("Stack underflow");
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::LoadConstant => {
                 if instruction.opcode.operand_count() != 1 {
@@ -210,7 +258,7 @@ impl InstructionExecutor {
                 let value = instruction.operands[0];
                 // push the value to the stack as Integer
                 stack.push(StackValue::Integer(value));
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Multiply => {
                 if instruction.opcode.operand_count() > 0 {
@@ -235,7 +283,7 @@ impl InstructionExecutor {
                 } else {
                     panic!("Stack underflow");
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Print => {
                 if instruction.opcode.operand_count() > 0 {
@@ -253,7 +301,7 @@ impl InstructionExecutor {
                 } else {
                     panic!("Stack underflow");
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::LoadMemory => {
                 if instruction.opcode.operand_count() != 1 {
@@ -265,7 +313,7 @@ impl InstructionExecutor {
                     Ok(value) => stack.push(StackValue::Integer(value)),
                     Err(e) => panic!("Memory error: {}", e),
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::StoreMemory => {
                 if instruction.opcode.operand_count() != 1 {
@@ -277,12 +325,11 @@ impl InstructionExecutor {
 
                 match value {
                     StackValue::Integer(i) => match memory.write(address, i) {
-                        Ok(_) => {}
+                        Ok(_) => ExecutionSignal::Continue,
                         Err(e) => panic!("Memory error: {}", e),
                     },
                     _ => panic!("Can only store integers in memory"),
                 }
-                None
             }
             Opcode::JumpIfZero => {
                 if instruction.opcode.operand_count() != 1 {
@@ -300,12 +347,12 @@ impl InstructionExecutor {
                 if let Some(value) = stack.pop() {
                     if value.is_zero() {
                         // Jump to the specified address
-                        return Some(jump_address);
+                        return ExecutionSignal::Jump(jump_address);
                     }
                 } else {
                     panic!("Stack underflow in JumpIfZero");
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Divide => {
                 if instruction.opcode.operand_count() > 0 {
@@ -337,7 +384,7 @@ impl InstructionExecutor {
                     panic!("Stack underflow");
                 }
 
-                None
+                ExecutionSignal::Continue
             }
             Opcode::LoadFromRegion => {
                 let region_id = instruction.operands[0] as usize;
@@ -351,7 +398,7 @@ impl InstructionExecutor {
                     3 => MemoryRegionType::Heap,
                     4 => MemoryRegionType::Constants,
                     5 => MemoryRegionType::IO,
-                    _ => return None,
+                    _ => panic!("Invalid region ID for LoadFromRegion: {}", region_id),
                 };
 
                 let value = memory.read_from_region(region_type, offset);
@@ -359,7 +406,7 @@ impl InstructionExecutor {
                     Ok(value) => stack.push(StackValue::Integer(value)),
                     Err(e) => panic!("Memory error: {}", e),
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::StoreToRegion => {
                 let region_id = instruction.operands[0] as usize;
@@ -374,13 +421,13 @@ impl InstructionExecutor {
                     3 => MemoryRegionType::Heap,
                     4 => MemoryRegionType::Constants,
                     5 => MemoryRegionType::IO,
-                    _ => return None,
+                    _ => panic!("Invalid region ID for StoreToRegion: {}", region_id),
                 };
 
                 match value {
                     StackValue::Integer(i) => {
                         match memory.write_to_region(region_type, offset, i) {
-                            Ok(_) => None,
+                            Ok(_) => ExecutionSignal::Continue,
                             Err(e) => panic!("Memory error: {}", e),
                         }
                     }
@@ -408,7 +455,7 @@ impl InstructionExecutor {
 
                 // Das Return-Address-Handling sollte in der CPU passieren
                 // Hier verwenden wir einen temporären Wert
-                let return_address = address + 4;
+                let return_address = current_pc_of_instruction + 4;
 
                 // Frame erstellen
                 let frame = StackFrame {
@@ -428,7 +475,7 @@ impl InstructionExecutor {
                 stack.current_frame = Some(stack.frames.len() - 1);
 
                 // Springe zur Funktionsadresse
-                Some(address)
+                ExecutionSignal::Jump(address)
             }
             Opcode::Return => {
                 // Muss mindestens einen Frame haben
@@ -456,7 +503,7 @@ impl InstructionExecutor {
                 );
 
                 // Lokale Variablen und Parameter entfernen
-                stack.values.truncate(base_pointer);
+                stack.values.clear();
 
                 // Frame entfernen
                 stack.frames.pop();
@@ -472,7 +519,7 @@ impl InstructionExecutor {
                 }
 
                 // Zur Rücksprungadresse zurückkehren
-                Some(return_address)
+                ExecutionSignal::Jump(return_address)
             }
             Opcode::LoadLocal => {
                 let local_index = instruction.operands[0] as usize;
@@ -516,7 +563,7 @@ impl InstructionExecutor {
                     let value = stack.values[stack_index];
                     stack.push(value);
 
-                    None
+                    ExecutionSignal::Continue
                 } else {
                     panic!("LoadLocal: No active stack frame");
                 }
@@ -536,7 +583,7 @@ impl InstructionExecutor {
                         if stack_index < stack.values.len() {
                             // Speichere den Wert in den Stack an der entsprechenden Position
                             stack.values[stack_index] = value;
-                            None
+                            ExecutionSignal::Continue
                         } else {
                             panic!(
                                 "Invalid local variable index: {} (stack index: {})",
@@ -569,7 +616,7 @@ impl InstructionExecutor {
                 } else {
                     panic!("Stack underflow");
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Power => {
                 if instruction.opcode.operand_count() > 0 {
@@ -590,7 +637,7 @@ impl InstructionExecutor {
                 } else {
                     panic!("Stack underflow");
                 }
-                None
+                ExecutionSignal::Continue
             }
             Opcode::PickN => {
                 if instruction.opcode.operand_count() != 1 {
@@ -603,7 +650,7 @@ impl InstructionExecutor {
                 }
 
                 stack.copy_nth_to_top(n);
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Dup => {
                 if instruction.opcode.operand_count() > 0 {
@@ -612,7 +659,7 @@ impl InstructionExecutor {
 
                 let value = stack.peek().expect("Stack underflow");
                 stack.push(*value);
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Swap => {
                 if instruction.opcode.operand_count() > 0 {
@@ -623,7 +670,7 @@ impl InstructionExecutor {
                 let b = stack.pop().expect("Stack underflow");
                 stack.push(a);
                 stack.push(b);
-                None
+                ExecutionSignal::Continue
             },
             Opcode::Drop => {
                 if instruction.opcode.operand_count() > 0 {
@@ -631,7 +678,7 @@ impl InstructionExecutor {
                 }
 
                 stack.pop();
-                None
+                ExecutionSignal::Continue
             }, 
             Opcode::Alloc => {
                 if instruction.opcode.operand_count() != 1 {
@@ -648,7 +695,7 @@ impl InstructionExecutor {
                     None => stack.push(StackValue::Reference(0)), // Null pointer
                 }
                 
-                None
+                ExecutionSignal::Continue
             }
             Opcode::Free => {
                 if instruction.opcode.operand_count() > 0 {
@@ -660,7 +707,7 @@ impl InstructionExecutor {
                     Some(StackValue::Reference(addr)) => {
                         if addr == 0 {
                             // Null pointer, nothing to free
-                            return None;
+                            return ExecutionSignal::Continue;
                         }
                         
                         // Try to deallocate the memory
@@ -673,7 +720,7 @@ impl InstructionExecutor {
                     None => panic!("Stack underflow in Free instruction"),
                 }
                 
-                None
+                ExecutionSignal::Continue
             }
             Opcode::LoadHeap => {
                 if instruction.opcode.operand_count() > 0 {
@@ -714,7 +761,7 @@ impl InstructionExecutor {
                     }
                 }
 
-                None
+                ExecutionSignal::Continue
             }
             Opcode::StoreHeap => {
                 if instruction.opcode.operand_count() > 0 {
@@ -755,7 +802,7 @@ impl InstructionExecutor {
                     }
                 }
 
-                None
+                ExecutionSignal::Continue
             }
             Opcode::MemSet => {
                 if instruction.opcode.operand_count() > 0 {
@@ -788,15 +835,38 @@ impl InstructionExecutor {
                 // Setze den Speicherbereich (in einer Schleife)
                 for i in 0..count {
                     match memory.write(addr + i, value) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) => {
                             panic!("MemSet: Memory error at offset {}: {}", i, e);
                         }
                     }
                 }
 
-                None
+                ExecutionSignal::Continue
             }
+            // --- Platzhalter für neue Opcodes ---
+            // Sie müssen diese Opcodes zu Ihrer Opcode-Enum hinzufügen (vermutlich in opcode.rs)
+            Opcode::Yield => {
+                // Signalisiert der VM-Hauptschleife, dass ein Kontextwechsel stattfinden soll.
+                // Keine Operanden erwartet.
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Yield instruction requires 0 operands");
+                }
+                ExecutionSignal::Yield
+            }
+            Opcode::TerminateProcess => {
+                // Signalisiert der VM-Hauptschleife, dass der aktuelle Prozess beendet werden soll.
+                // Keine Operanden erwartet.
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("TerminateProcess instruction requires 0 operands");
+                }
+                ExecutionSignal::Terminate
+            }
+            // Fügen Sie hier weitere Opcodes hinzu, falls erforderlich.
+            // Der _-Arm ist für den Fall gedacht, dass die Opcode-Enum erweitert wird
+            // und nicht alle neuen Opcodes hier sofort behandelt werden.
+            // Wenn alle existierenden Opcodes oben abgedeckt sind, ist dieser Arm aktuell unerreichbar.
+            _ => panic!("Unbekannter oder nicht implementierter Opcode: {:?}", instruction.opcode),
         }
     }
 }
@@ -813,28 +883,40 @@ mod tests {
     #[test]
     fn test_instruction_fetcher() {
         // Create a simple program with correct byte ordering
-        let program = vec![
+        // This program will be loaded into memory, not the fetcher directly.
+        let program_bytes = vec![
             0x00, 0x00, 0x00, 0x01, // Add (0x01)
             0x00, 0x00, 0x00, 0x02, // Store (0x02)
         ];
 
+        let mut memory = SegmentedMemory::create_test_layout(100).expect("Failed to create memory");
+        // Load program_bytes into memory at address 0
+        for (i, chunk) in program_bytes.chunks(4).enumerate() {
+            if chunk.len() == 4 {
+                let val = i32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                memory.write(i, val).expect("Memory write failed");
+            }
+        }
+
         let mut fetcher = InstructionFetcher::new();
-        fetcher.load_program(&program);
 
         // Fetch first instruction
-        let instruction1 = fetcher.fetch();
-        assert!(instruction1.is_some());
-        let instruction1 = instruction1.unwrap();
-        assert_eq!(instruction1.opcode(), Opcode::Add);
+        fetcher.set_pc(0);
+        let instruction1_opt = fetcher.fetch(&memory); // instruction1_opt is Option<RawInstruction>
+        assert!(instruction1_opt.is_some());
+        let instruction1_raw = instruction1_opt.unwrap(); // instruction1_raw is RawInstruction
+        assert_eq!(instruction1_raw.opcode().expect("Opcode decoding failed for instruction1"), Opcode::Add);
+        assert_eq!(fetcher.pc, 4); // PC should advance
 
         // Fetch second instruction
-        let instruction2 = fetcher.fetch();
-        assert!(instruction2.is_some());
-        let instruction2 = instruction2.unwrap();
-        assert_eq!(instruction2.opcode(), Opcode::Store);
+        let instruction2_opt = fetcher.fetch(&memory); // instruction2_opt is Option<RawInstruction>
+        assert!(instruction2_opt.is_some());
+        let instruction2_raw = instruction2_opt.unwrap(); // instruction2_raw is RawInstruction
+        assert_eq!(instruction2_raw.opcode().expect("Opcode decoding failed for instruction2"), Opcode::Store);
+        assert_eq!(fetcher.pc, 8);
 
         // No more instructions
-        let instruction3 = fetcher.fetch();
+        let instruction3 = fetcher.fetch(&memory);
         assert!(instruction3.is_none());
     }
 
@@ -843,17 +925,32 @@ mod tests {
         let decoder = InstructionDecoder;
 
         // Test decoding Add (no operands)
-        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x01);
-        let instruction = decoder.decode(raw);
-        assert_eq!(instruction.opcode, Opcode::Add);
-        assert!(instruction.operands.is_empty());
+        let raw_add = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x01);
+        let decoded_add_result = decoder.decode(raw_add);
+        assert!(decoded_add_result.is_ok());
+        let instruction_add = decoded_add_result.unwrap();
+        assert_eq!(instruction_add.opcode, Opcode::Add);
+        assert!(instruction_add.operands.is_empty());
 
         // Test decoding Store (with operand)
         // First byte is the operand (big endian)
-        let raw = RawInstruction::from_bytes(0x2A, 0x00, 0x00, 0x02);
-        let instruction = decoder.decode(raw);
-        assert_eq!(instruction.opcode, Opcode::Store);
-        assert_eq!(instruction.operands, vec![0x2A0000]);
+        let raw_store = RawInstruction::from_bytes(0x2A, 0x00, 0x00, 0x02);
+        let decoded_store_result = decoder.decode(raw_store);
+        assert!(decoded_store_result.is_ok());
+        let instruction_store = decoded_store_result.unwrap();
+        assert_eq!(instruction_store.opcode, Opcode::Store);
+        // RawInstruction::get_operands() extracts the operand correctly based on opcode definition
+        // For Store (operand_count = 1), it should extract 0x2A0000
+        assert_eq!(instruction_store.operands, vec![0x2A0000]);
+
+        // Test decoding an invalid opcode
+        let raw_invalid = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0xFE); // 0xFE is not a valid opcode
+        let decoded_invalid_result = decoder.decode(raw_invalid);
+        assert!(decoded_invalid_result.is_err());
+        match decoded_invalid_result.err().unwrap() {
+            DecodeError::InvalidOpcode(InvalidOpcodeError(val)) => assert_eq!(val, 0xFE),
+            // _ => panic!("Expected InvalidOpcode error"), // Not needed if only one variant
+        }
     }
     
     #[test]
@@ -862,6 +959,7 @@ mod tests {
         let mut executor = InstructionExecutor::new();
         let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
         let mut stack = Stack::new(100);
+        let current_pc = 0; // Dummy PC für Tests
         
         // Test Alloc instruction
         let alloc_instr = Instruction {
@@ -869,7 +967,8 @@ mod tests {
             operands: vec![10], // Allocate 10 words
         };
         
-        executor.execute(&alloc_instr, &mut stack, &mut memory);
+        let signal = executor.execute(&alloc_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Continue);
         
         // Check if we have a reference on the stack
         let addr = match stack.peek() {
@@ -891,7 +990,8 @@ mod tests {
             operands: vec![],
         };
         
-        executor.execute(&memset_instr, &mut stack, &mut memory);
+        let signal = executor.execute(&memset_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Continue);
         
         // The stack should be empty after MemSet
         assert_eq!(stack.len(), 0);
@@ -907,7 +1007,8 @@ mod tests {
             operands: vec![],
         };
         
-        executor.execute(&store_heap_instr, &mut stack, &mut memory);
+        let signal = executor.execute(&store_heap_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Continue);
         
         // The stack should be empty after StoreHeap
         assert_eq!(stack.len(), 0);
@@ -922,7 +1023,8 @@ mod tests {
             operands: vec![],
         };
         
-        executor.execute(&load_heap_instr, &mut stack, &mut memory);
+        let signal = executor.execute(&load_heap_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Continue);
         
         // Check if we loaded the right value (99)
         let loaded_value = match stack.peek() {
@@ -937,7 +1039,8 @@ mod tests {
         stack.push(StackValue::Reference(addr));
         stack.push(StackValue::Integer(3)); // Different offset
         
-        executor.execute(&load_heap_instr, &mut stack, &mut memory);
+        let signal = executor.execute(&load_heap_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Continue);
         
         // Check if we loaded the right value (42 from MemSet)
         let loaded_value = match stack.peek() {
@@ -956,7 +1059,8 @@ mod tests {
             operands: vec![],
         };
         
-        executor.execute(&free_instr, &mut stack, &mut memory);
+        let signal = executor.execute(&free_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Continue);
         
         // Check if we got a success boolean
         let success = match stack.peek() {
@@ -973,6 +1077,7 @@ mod tests {
         let mut executor = InstructionExecutor::new();
         let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
         let mut stack = Stack::new(100);
+        let current_pc = 0; // Dummy PC für Tests
 
         // Allocate some memory
         let addr = memory.allocate(10).unwrap();
@@ -990,6 +1095,48 @@ mod tests {
             operands: vec![],
         };
 
-        executor.execute(&load_heap_instr, &mut stack, &mut memory);
+        executor.execute(&load_heap_instr, &mut stack, &mut memory, current_pc);
+    }
+
+    #[test]
+    fn test_jump_if_zero_jumps() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(100);
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap(); // Erhöhte Speichergröße
+        let current_pc = 0;
+        let jump_target_address = 42 * 4; // Adresse muss durch 4 teilbar sein
+
+        // Push 0 onto the stack to trigger the jump
+        stack.push(StackValue::Integer(0));
+
+        let jz_instr = Instruction {
+            opcode: Opcode::JumpIfZero,
+            operands: vec![jump_target_address as i32], // Operand ist die Sprungadresse
+        };
+
+        let signal = executor.execute(&jz_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Jump(jump_target_address));
+        assert_eq!(stack.len(), 0); // Value should be popped
+    }
+
+    #[test]
+    fn test_jump_if_zero_continues() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(100);
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap(); // Erhöhte Speichergröße
+        let current_pc = 0;
+        let jump_target_address = 42 * 4;
+
+        // Push a non-zero value onto the stack
+        stack.push(StackValue::Integer(10));
+
+        let jz_instr = Instruction {
+            opcode: Opcode::JumpIfZero,
+            operands: vec![jump_target_address as i32], // Operand ist die Sprungadresse
+        };
+
+        let signal = executor.execute(&jz_instr, &mut stack, &mut memory, current_pc);
+        assert_eq!(signal, ExecutionSignal::Continue);
+        assert_eq!(stack.len(), 0); // Value should be popped
     }
 }

@@ -3,6 +3,8 @@ use crate::opcode::Opcode;
 #[cfg(feature = "derive")]
 pub use intoraw_derive::IntoRaw;
 
+use crate::opcode::InvalidOpcodeError; // Import the error type
+
 #[derive(Debug, Clone)]
 pub struct Instruction {
     pub opcode: Opcode, 
@@ -24,40 +26,42 @@ impl RawInstruction {
         Self(value)
     }
 
-    pub fn opcode(&self) -> Opcode {
-        Opcode::from(self.0 & 0xff)
+    pub fn opcode(&self) -> Result<Opcode, InvalidOpcodeError> {
+        Opcode::try_from((self.0 & 0xff) as u8)
     }
 
     pub fn operand(&self) -> i32 {
         (self.0 >> 8) & 0xffffff
     }
 
-    pub fn get_operands(&self) -> Vec<i32> {
+    pub fn get_operands(&self) -> Result<Vec<i32>, InvalidOpcodeError> {
         let mut operands = Vec::new();
-        if self.has_operands() {
+        if self.has_operands()? {
             operands.push(self.operand());
         }
-        operands
+        Ok(operands)
     }
 
     pub fn as_i32(&self) -> i32 {
         self.0
     }
 
-    pub fn has_operands(&self) -> bool {
-        self.opcode().operand_count() > 0
+    pub fn has_operands(&self) -> Result<bool, InvalidOpcodeError> {
+        Ok(self.opcode()?.operand_count() > 0)
     }
 
-    pub fn operand_count(&self) -> usize {
-        self.opcode().operand_count()
+    pub fn operand_count(&self) -> Result<usize, InvalidOpcodeError> {
+        Ok(self.opcode()?.operand_count())
     }
 }
 
-impl From<RawInstruction> for Instruction {
-    fn from(raw: RawInstruction) -> Self {
-        let opcode = raw.opcode();
-        let operands = raw.get_operands();
-        Self { opcode, operands }
+impl TryFrom<RawInstruction> for Instruction {
+    type Error = InvalidOpcodeError;
+
+    fn try_from(raw: RawInstruction) -> Result<Self, Self::Error> {
+        let opcode = raw.opcode()?;
+        let operands = raw.get_operands()?;
+        Ok(Self { opcode, operands })
     }
 }
 
@@ -180,22 +184,22 @@ mod tests {
     fn test_modulo_instruction() {
         let modulo = Modulo;
         let raw = modulo.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Modulo);
-        assert!(!raw.has_operands());
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Modulo);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
     }
 
     #[test]
     fn test_power_instruction() {
         let power = Power;
         let raw = power.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Power);
-        assert!(!raw.has_operands());
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Power);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
     }
 
     #[test]
     fn test_power_instruction_from_raw() {
         let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x12);
-        let instruction: Instruction = raw.into();
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
         assert_eq!(instruction.opcode, Opcode::Power);
         assert_eq!(instruction.operands, vec![]);
     }
@@ -204,7 +208,7 @@ mod tests {
     fn test_pickn_instruction() {
         let pickn = PickN(1);
         let raw = pickn.into_raw();
-        assert_eq!(raw.opcode(), Opcode::PickN);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::PickN);
         assert_eq!(raw.operand(), 1);
     }
 
@@ -212,40 +216,40 @@ mod tests {
     fn test_dup_instruction() {
         let dup = Dup;
         let raw = dup.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Dup);
-        assert!(!raw.has_operands());
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Dup);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
     }
 
     #[test]
     fn test_swap_instruction() {
         let swap = Swap;
         let raw = swap.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Swap);
-        assert!(!raw.has_operands());
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Swap);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
     }
 
     #[test]
     fn test_drop_instruction() {
         let drop = Drop;
         let raw = drop.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Drop);
-        assert!(!raw.has_operands());
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Drop);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
     }
 
     #[test]
     fn test_raw_instruction() {
         // Create a Store instruction (0x02) with operand 0x010203
         let raw = RawInstruction::from_bytes(0x01, 0x02, 0x03, 0x02);
-        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Store);
         assert_eq!(raw.operand(), 0x010203);
-        assert!(raw.has_operands());
+        assert!(raw.has_operands().expect("Failed to check operands"));
     }
 
     #[test]
     fn test_raw_instruction_into_instruction() {
         // Create a Store instruction (0x02) with operand 0x010203
         let raw = RawInstruction::from_bytes(0x01, 0x02, 0x03, 0x02);
-        let instruction: Instruction = raw.into();
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
         assert_eq!(instruction.opcode, Opcode::Store);
         assert_eq!(instruction.operands, vec![0x010203]);
     }
@@ -255,15 +259,15 @@ mod tests {
         // Test Add instruction (no operands)
         let add = Add;
         let raw = add.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Add);
-        assert!(!raw.has_operands());
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Add);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
         
         // Test Store instruction with operand
         let store = Store(42);
         let raw = store.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Store);
         assert_eq!(raw.operand(), 42);
-        assert!(raw.has_operands());
+        assert!(raw.has_operands().expect("Failed to check operands"));
     }
 }
 
@@ -332,23 +336,23 @@ mod derive_tests {
         // Test DirectAdd
         let add = DirectAdd;
         let raw = add.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Add);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Add);
         
         // Test DirectStore
         let store = DirectStore(123);
         let raw = store.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Store);
         assert_eq!(raw.operand(), 123);
         
         // Test DirectSub
         let sub = DirectSub;
         let raw = sub.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Sub);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Sub);
         
         // Test DirectLoadConstant
         let load = DirectLoadConstant(42);
         let raw = load.into_raw();
-        assert_eq!(raw.opcode(), Opcode::LoadConstant);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::LoadConstant);
         assert_eq!(raw.operand(), 42);
     }
     
@@ -357,12 +361,12 @@ mod derive_tests {
         // Test derived Add instruction
         let add = CustomAdd;
         let raw = add.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Add);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Add);
         
         // Test derived Store instruction
         let store = CustomStore(123);
         let raw = store.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Store);
         assert_eq!(raw.operand(), 123);
         
         // Test custom opcodes with attributes
@@ -408,15 +412,15 @@ mod derive_tests {
         // Test AddInstruction (name normalization)
         let add = AddInstruction;
         let raw = add.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Add);
-        assert!(!raw.has_operands());
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Add);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
         
         // Test MyCustomStoreInstruction (with custom prefix and suffix)
         let store = MyCustomStoreInstruction(42);
         let raw = store.into_raw();
-        assert_eq!(raw.opcode(), Opcode::Store);
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Store);
         assert_eq!(raw.operand(), 42);
-        assert!(raw.has_operands());
+        assert!(raw.has_operands().expect("Failed to check operands"));
     }
 }
 

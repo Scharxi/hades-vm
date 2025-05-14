@@ -109,6 +109,7 @@ pub struct StackFrame {
 /// The Stack manages both values and frames, providing an execution
 /// context for the virtual machine and supporting function calls with
 /// local variables.
+#[derive(Clone)]
 pub struct Stack {
     /// The actual stack values
     pub values: Vec<StackValue>,

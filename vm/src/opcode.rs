@@ -28,7 +28,12 @@ pub enum Opcode {
     LoadHeap = 0x52,  // Laden von Werten aus dem Heap
     StoreHeap = 0x53, // Speichern von Werten im Heap
     MemSet = 0x54,    // Initialisieren eines Speicherbereichs mit einem Wert
+    Yield = 0xF0,
+    TerminateProcess = 0xFF,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidOpcodeError(pub u8);
 
 impl Opcode {
     pub fn operand_count(&self) -> usize {
@@ -60,6 +65,8 @@ impl Opcode {
             Opcode::LoadHeap => 0, // Erwartet zwei Werte auf dem Stack: Adresse und Offset
             Opcode::StoreHeap => 0, // Erwartet drei Werte auf dem Stack: Adresse, Offset und Wert
             Opcode::MemSet => 0, // Erwartet drei Werte auf dem Stack: Adresse, Anzahl und Wert
+            Opcode::Yield => 0,
+            Opcode::TerminateProcess => 0,
         }
     }
 }
@@ -70,15 +77,54 @@ impl Into<u8> for Opcode {
     }
 }
 
-impl From<u8> for Opcode {
-    fn from(value: u8) -> Self {
-        unsafe { std::mem::transmute(value) }
+impl TryFrom<u8> for Opcode {
+    type Error = InvalidOpcodeError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x01 => Ok(Opcode::Add),
+            0x02 => Ok(Opcode::Store),
+            0x03 => Ok(Opcode::Sub),
+            0x04 => Ok(Opcode::LoadConstant),
+            0x05 => Ok(Opcode::Multiply),
+            0x06 => Ok(Opcode::Print),
+            0x07 => Ok(Opcode::LoadMemory),
+            0x08 => Ok(Opcode::StoreMemory),
+            0x09 => Ok(Opcode::JumpIfZero),
+            0x0A => Ok(Opcode::Divide),
+            0x0B => Ok(Opcode::LoadFromRegion),
+            0x0C => Ok(Opcode::StoreToRegion),
+            0x0D => Ok(Opcode::Call),
+            0x0E => Ok(Opcode::Return),
+            0x0F => Ok(Opcode::LoadLocal),
+            0x10 => Ok(Opcode::StoreLocal),
+            0x11 => Ok(Opcode::Modulo),
+            0x12 => Ok(Opcode::Power),
+            0x13 => Ok(Opcode::PickN),
+            0x14 => Ok(Opcode::Dup),
+            0x15 => Ok(Opcode::Swap),
+            0x16 => Ok(Opcode::Drop),
+            0x50 => Ok(Opcode::Alloc),
+            0x51 => Ok(Opcode::Free),
+            0x52 => Ok(Opcode::LoadHeap),
+            0x53 => Ok(Opcode::StoreHeap),
+            0x54 => Ok(Opcode::MemSet),
+            0xF0 => Ok(Opcode::Yield),
+            0xFF => Ok(Opcode::TerminateProcess),
+            _ => Err(InvalidOpcodeError(value)),
+        }
     }
 }
 
-impl From<i32> for Opcode {
-    fn from(value: i32) -> Self {
-        Opcode::from(value as u8)
+impl TryFrom<i32> for Opcode {
+    type Error = InvalidOpcodeError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        if value < 0 || value > u8::MAX as i32 {
+            Err(InvalidOpcodeError(value as u8))
+        } else {
+            Opcode::try_from(value as u8)
+        }
     }
 }
 
@@ -115,6 +161,8 @@ impl OpcodeMapping for Opcode {
             "LoadHeap" => Some(Opcode::LoadHeap as u8),
             "StoreHeap" => Some(Opcode::StoreHeap as u8),
             "MemSet" => Some(Opcode::MemSet as u8),
+            "Yield" => Some(Opcode::Yield as u8),
+            "TerminateProcess" => Some(Opcode::TerminateProcess as u8),
             _ => None,
         }
     }
