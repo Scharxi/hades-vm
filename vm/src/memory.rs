@@ -205,6 +205,122 @@ impl SegmentedMemory {
             region_map: vec![None; initial_size],
         }
     }
+
+    /// Reads a value directly from memory without allocation checks.
+    /// This is an internal helper method used by is_allocated to prevent circular dependencies.
+    fn read_direct(&self, address: usize) -> Result<i32, String> {
+        // Prüfen, ob die Adresse gültig ist
+        if address >= self.data.len() {
+            return Err(format!("Address {} is out of bounds", address));
+        }
+        
+        // Ermitteln, in welcher Region die Adresse liegt
+        let region_type = self.region_map[address]
+            .ok_or_else(|| format!("Address {} is not in any defined region", address))?;
+        
+        let region = self.get_region(region_type)?;
+        
+        // Prüfen, ob die Region Leserecht hat
+        if !region.has_permission(AccessPermission::Read) {
+            return Err(format!("Region {} is not readable", region_type));
+        }
+        
+        // Wert direkt lesen
+        Ok(self.data[address])
+    }
+
+    /// Writes a value directly to memory without allocation checks.
+    /// This is an internal helper method used by is_allocated to prevent circular dependencies.
+    fn write_direct(&mut self, address: usize, value: i32) -> Result<(), String> {
+        // Prüfen, ob die Adresse gültig ist
+        if address >= self.data.len() {
+            return Err(format!("Address {} is out of bounds", address));
+        }
+        
+        // Ermitteln, in welcher Region die Adresse liegt
+        let region_type = self.region_map[address]
+            .ok_or_else(|| format!("Address {} is not in any defined region", address))?;
+        
+        let region = self.get_region(region_type)?;
+        
+        // Prüfen, ob die Region Schreibrecht hat
+        if !region.has_permission(AccessPermission::Write) {
+            return Err(format!("Region {} is not writable", region_type));
+        }
+        
+        // Wert direkt schreiben
+        self.data[address] = value;
+        Ok(())
+    }
+
+    /// Checks if a given address is allocated in the heap.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The address to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if the address is allocated, `false` otherwise
+    pub fn is_allocated(&self, address: usize) -> bool {
+        // Heap-Region abrufen
+        let heap_region = match self.regions.get(&MemoryRegionType::Heap) {
+            Some(region) => region,
+            None => return false,
+        };
+        
+        // Prüfen, ob Bitmap initialisiert ist
+        let heap_start = heap_region.start;
+        const ALLOC_MARKER: i32 = 0xA110C;
+        
+        let bitmap_initialized = match self.read_direct(heap_start) {
+            Ok(marker) => marker == ALLOC_MARKER,
+            Err(_) => false,
+        };
+        
+        if !bitmap_initialized {
+            return false;
+        }
+        
+        // Block-Anzahl lesen
+        let block_count = match self.read_direct(heap_start + 1) {
+            Ok(count) => count as usize,
+            Err(_) => return false,
+        };
+        
+        // Bitmap durchsuchen
+        const BITMAP_HEADER_SIZE: usize = 2;
+        const BLOCK_ENTRY_SIZE: usize = 3;
+        
+        for i in 0..block_count {
+            let block_entry_offset = BITMAP_HEADER_SIZE + i * BLOCK_ENTRY_SIZE;
+            
+            // Block-Informationen lesen
+            let block_addr = match self.read_direct(heap_start + block_entry_offset) {
+                Ok(addr) => addr as usize,
+                Err(_) => continue,
+            };
+            
+            // Block-Größe lesen
+            let block_size = match self.read_direct(heap_start + block_entry_offset + 1) {
+                Ok(size) => size as usize,
+                Err(_) => continue,
+            };
+            
+            // Prüfen, ob der Block alloziert ist
+            let is_allocated = match self.read_direct(heap_start + block_entry_offset + 2) {
+                Ok(flag) => flag != 0,
+                Err(_) => continue,
+            };
+            
+            // Prüfen, ob die Adresse innerhalb dieses Blocks liegt
+            if address >= block_addr && address < block_addr + block_size {
+                return is_allocated;
+            }
+        }
+        
+        false
+    }
     
     /// Defines a new memory region within this memory.
     ///
@@ -346,6 +462,11 @@ impl SegmentedMemory {
             return Err(format!("Region {} is not readable", region_type));
         }
         
+        // If this is a heap address, check if it's allocated
+        if region_type == MemoryRegionType::Heap && !self.is_allocated(address) {
+            return Err(format!("Address {} is not allocated", address));
+        }
+        
         // Wert lesen
         Ok(self.data[address])
     }
@@ -378,6 +499,11 @@ impl SegmentedMemory {
         // Prüfen, ob die Region Schreibrecht hat
         if !region.has_permission(AccessPermission::Write) {
             return Err(format!("Region {} is not writable", region_type));
+        }
+        
+        // If this is a heap address, check if it's allocated
+        if region_type == MemoryRegionType::Heap && !self.is_allocated(address) {
+            return Err(format!("Address {} is not allocated", address));
         }
         
         // Wert schreiben
@@ -543,7 +669,7 @@ impl SegmentedMemory {
         const ALLOC_MARKER: i32 = 0xA110C;
         
         // Check if our allocation bitmap is initialized
-        let bitmap_initialized = match self.read(heap_start) {
+        let bitmap_initialized = match self.read_direct(heap_start) {
             Ok(marker) => marker == ALLOC_MARKER,
             Err(_) => false,
         };
@@ -551,33 +677,43 @@ impl SegmentedMemory {
         // If not initialized, set up our allocation bitmap
         if !bitmap_initialized {
             // Write our marker
-            if let Err(_err) = self.write(heap_start, ALLOC_MARKER) {
+            if let Err(_err) = self.write_direct(heap_start, ALLOC_MARKER) {
                 return None; // Can't initialize bitmap
             }
             
             // Reserve space for the bitmap itself: 1 word for marker + 1 word for allocation count
             // The rest of the bitmap will grow as needed
             const BITMAP_HEADER_SIZE: usize = 2;
+            const BLOCK_ENTRY_SIZE: usize = 3;
             
-            // Mark all memory as free in a single large block
-            // Store the first free block's size right after the bitmap header
-            if let Err(_err) = self.write(heap_start + BITMAP_HEADER_SIZE, (heap_size - BITMAP_HEADER_SIZE - 1) as i32) {
+            // First block starts right after the header and first block entry
+            let first_block_addr = heap_start + BITMAP_HEADER_SIZE + BLOCK_ENTRY_SIZE;
+            // First block size is the rest of the heap minus the bitmap header and first block entry
+            let first_block_size = heap_size - BITMAP_HEADER_SIZE - BLOCK_ENTRY_SIZE;
+            
+            // Store the first block's address
+            if let Err(_err) = self.write_direct(heap_start + BITMAP_HEADER_SIZE, first_block_addr as i32) {
                 return None; // Can't initialize free list
             }
             
+            // Store the first block's size
+            if let Err(_err) = self.write_direct(heap_start + BITMAP_HEADER_SIZE + 1, first_block_size as i32) {
+                return None;
+            }
+            
             // Write 0 to indicate this block is free
-            if let Err(_err) = self.write(heap_start + BITMAP_HEADER_SIZE + 1, 0) {
+            if let Err(_err) = self.write_direct(heap_start + BITMAP_HEADER_SIZE + 2, 0) {
                 return None;
             }
             
             // Store the number of blocks (just 1 initially)
-            if let Err(_err) = self.write(heap_start + 1, 1) {
+            if let Err(_err) = self.write_direct(heap_start + 1, 1) {
                 return None;
             }
         }
         
         // Read the number of blocks
-        let block_count = match self.read(heap_start + 1) {
+        let block_count = match self.read_direct(heap_start + 1) {
             Ok(count) => count as usize,
             Err(_) => return None,
         };
@@ -596,17 +732,17 @@ impl SegmentedMemory {
             let block_entry_offset = BITMAP_HEADER_SIZE + i * BLOCK_ENTRY_SIZE;
             
             // Read block information
-            let block_addr = match self.read(heap_start + block_entry_offset) {
+            let block_addr = match self.read_direct(heap_start + block_entry_offset) {
                 Ok(addr) => addr as usize,
                 Err(_) => continue, // Skip this block if we can't read it
             };
             
-            let block_size = match self.read(heap_start + block_entry_offset + 1) {
+            let block_size = match self.read_direct(heap_start + block_entry_offset + 1) {
                 Ok(size) => size as usize,
                 Err(_) => continue,
             };
             
-            let is_allocated = match self.read(heap_start + block_entry_offset + 2) {
+            let is_allocated = match self.read_direct(heap_start + block_entry_offset + 2) {
                 Ok(flag) => flag != 0,
                 Err(_) => continue,
             };
@@ -616,12 +752,12 @@ impl SegmentedMemory {
                 // If the block is significantly larger than needed, split it
                 if block_size > size + BLOCK_ENTRY_SIZE + 1 {
                     // Update the current block's size
-                    if let Err(_) = self.write(heap_start + block_entry_offset + 1, size as i32) {
+                    if let Err(_) = self.write_direct(heap_start + block_entry_offset + 1, size as i32) {
                         continue;
                     }
                     
                     // Mark the current block as allocated
-                    if let Err(_) = self.write(heap_start + block_entry_offset + 2, 1) {
+                    if let Err(_) = self.write_direct(heap_start + block_entry_offset + 2, 1) {
                         continue;
                     }
                     
@@ -632,28 +768,28 @@ impl SegmentedMemory {
                     // Write the new block's information
                     let new_block_offset = BITMAP_HEADER_SIZE + block_count * BLOCK_ENTRY_SIZE;
                     
-                    if let Err(_) = self.write(heap_start + new_block_offset, new_block_addr as i32) {
+                    if let Err(_) = self.write_direct(heap_start + new_block_offset, new_block_addr as i32) {
                         // Just use the whole block if we can't split it
                         return Some(block_addr);
                     }
                     
-                    if let Err(_) = self.write(heap_start + new_block_offset + 1, new_block_size as i32) {
+                    if let Err(_) = self.write_direct(heap_start + new_block_offset + 1, new_block_size as i32) {
                         return Some(block_addr);
                     }
                     
-                    if let Err(_) = self.write(heap_start + new_block_offset + 2, 0) {
+                    if let Err(_) = self.write_direct(heap_start + new_block_offset + 2, 0) {
                         return Some(block_addr);
                     }
                     
                     // Update the block count
-                    if let Err(_) = self.write(heap_start + 1, (block_count + 1) as i32) {
+                    if let Err(_) = self.write_direct(heap_start + 1, (block_count + 1) as i32) {
                         return Some(block_addr);
                     }
                     
                     return Some(block_addr);
                 } else {
                     // Just mark the whole block as allocated
-                    if let Err(_) = self.write(heap_start + block_entry_offset + 2, 1) {
+                    if let Err(_) = self.write_direct(heap_start + block_entry_offset + 2, 1) {
                         continue;
                     }
                     
@@ -676,20 +812,20 @@ impl SegmentedMemory {
                 let new_block_addr = heap_start + bitmap_size;
                 
                 // Write the new block's information
-                if let Err(_) = self.write(new_block_addr, (new_block_addr + BLOCK_ENTRY_SIZE) as i32) {
+                if let Err(_) = self.write_direct(new_block_addr, (new_block_addr + BLOCK_ENTRY_SIZE) as i32) {
                     return None;
                 }
                 
-                if let Err(_) = self.write(new_block_addr + 1, size as i32) {
+                if let Err(_) = self.write_direct(new_block_addr + 1, size as i32) {
                     return None;
                 }
                 
-                if let Err(_) = self.write(new_block_addr + 2, 1) { // Mark as allocated
+                if let Err(_) = self.write_direct(new_block_addr + 2, 1) { // Mark as allocated
                     return None;
                 }
                 
                 // Update the block count
-                if let Err(_) = self.write(heap_start + 1, (block_count + 1) as i32) {
+                if let Err(_) = self.write_direct(heap_start + 1, (block_count + 1) as i32) {
                     return None;
                 }
                 
@@ -741,7 +877,7 @@ impl SegmentedMemory {
         
         // Check if our allocation bitmap is initialized
         const ALLOC_MARKER: i32 = 0xA110C;
-        let bitmap_initialized = match self.read(heap_start) {
+        let bitmap_initialized = match self.read_direct(heap_start) {
             Ok(marker) => marker == ALLOC_MARKER,
             Err(_) => false,
         };
@@ -751,7 +887,7 @@ impl SegmentedMemory {
         }
         
         // Read the number of blocks
-        let block_count = match self.read(heap_start + 1) {
+        let block_count = match self.read_direct(heap_start + 1) {
             Ok(count) => count as usize,
             Err(_) => return false,
         };
@@ -770,7 +906,7 @@ impl SegmentedMemory {
             let block_entry_offset = BITMAP_HEADER_SIZE + i * BLOCK_ENTRY_SIZE;
             
             // Read block information
-            let block_addr = match self.read(heap_start + block_entry_offset) {
+            let block_addr = match self.read_direct(heap_start + block_entry_offset) {
                 Ok(addr) => addr as usize,
                 Err(_) => continue,
             };
@@ -778,14 +914,14 @@ impl SegmentedMemory {
             // Check if this is the block we're looking for
             if block_addr == address {
                 // Check if it's allocated
-                let is_allocated = match self.read(heap_start + block_entry_offset + 2) {
+                let is_allocated = match self.read_direct(heap_start + block_entry_offset + 2) {
                     Ok(flag) => flag != 0,
                     Err(_) => continue,
                 };
                 
                 if is_allocated {
                     // Mark the block as free
-                    if let Err(_) = self.write(heap_start + block_entry_offset + 2, 0) {
+                    if let Err(_) = self.write_direct(heap_start + block_entry_offset + 2, 0) {
                         return false;
                     }
                     
@@ -1191,5 +1327,25 @@ mod tests {
         assert!(memory.deallocate(addr1));
         assert!(memory.deallocate(addr3));
         assert!(memory.deallocate(addr4));
+    }
+
+    #[test]
+    fn test_is_allocated() {
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
+        
+        // Allocate some memory
+        let addr1 = memory.allocate(50).unwrap();
+        assert!(memory.is_allocated(addr1));
+        
+        // Deallocate the memory
+        assert!(memory.deallocate(addr1));
+        assert!(!memory.is_allocated(addr1));
+        
+        // Try to deallocate the same block again (should fail)
+        assert!(!memory.deallocate(addr1));
+
+        // Try accessing an unallocated address (should fail)
+        let unallocated = memory.read(addr1);
+        assert!(unallocated.is_err());
     }
 }

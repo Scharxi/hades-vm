@@ -697,6 +697,10 @@ impl InstructionExecutor {
                     panic!("LoadHeap: Null pointer dereference");
                 }
 
+                if !memory.is_allocated(addr) {
+                    panic!("LoadHeap: Invalid address, not allocated");
+                }
+
                 // Calculate the absolute address
                 let absolute_addr = addr + offset;
 
@@ -961,5 +965,31 @@ mod tests {
         };
         
         assert!(success, "Deallocation should succeed");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_invalid_heap_access() {
+        let mut executor = InstructionExecutor::new();
+        let mut memory = SegmentedMemory::create_test_layout(1000).unwrap();
+        let mut stack = Stack::new(100);
+
+        // Allocate some memory
+        let addr = memory.allocate(10).unwrap();
+
+        // Deallocate the memory
+        let deallocated = memory.deallocate(addr);
+        assert!(deallocated);
+
+        // Test LoadHeap from an unallocated address
+        stack.push(StackValue::Reference(addr)); // Use Reference type instead of Integer
+        stack.push(StackValue::Integer(0)); // Offset
+        
+        let load_heap_instr = Instruction {
+            opcode: Opcode::LoadHeap,
+            operands: vec![],
+        };
+
+        executor.execute(&load_heap_instr, &mut stack, &mut memory);
     }
 }

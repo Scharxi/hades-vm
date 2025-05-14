@@ -1,0 +1,203 @@
+# Speicherverwaltungs-Demo für die Hades-VM
+# Dieses Programm demonstriert die Verwendung der dynamischen Speicherverwaltung
+# einschließlich Alloc, Free, LoadHeap, StoreHeap und MemSet.
+
+# 1. Alloziere ein Array mit 10 Elementen
+LoadConstant 10      # Größe des Arrays
+Alloc                # Alloziere Speicher
+                     # Stack: [reference]
+
+# 2. Initialisiere das gesamte Array mit Nullen
+Dup                  # Dupliziere die Referenz
+                     # Stack: [reference, reference]
+LoadConstant 10      # Anzahl der zu initialisierenden Elemente
+LoadConstant 0       # Initialwert (0)
+MemSet               # Initialisiere den Speicher
+                     # Stack: [reference]
+
+# 3. Speichere die Länge des Arrays an Offset 0
+Dup                  # Dupliziere die Referenz
+                     # Stack: [reference, reference]
+LoadConstant 0       # Offset 0
+LoadConstant 10      # Länge 10
+StoreHeap            # Speichere die Länge
+                     # Stack: [reference]
+
+# 4. Fülle das Array mit aufsteigenden Werten (1, 2, 3, ...) ab Offset 1
+# Element 1
+Dup                  # Dupliziere die Referenz
+LoadConstant 1       # Offset 1
+LoadConstant 1       # Wert 1
+StoreHeap            # Speichere den Wert
+
+# Element 2
+Dup                  # Dupliziere die Referenz
+LoadConstant 2       # Offset 2
+LoadConstant 2       # Wert 2
+StoreHeap            # Speichere den Wert
+
+# Element 3
+Dup                  # Dupliziere die Referenz
+LoadConstant 3       # Offset 3
+LoadConstant 3       # Wert 3
+StoreHeap            # Speichere den Wert
+
+# Element 4
+Dup                  # Dupliziere die Referenz
+LoadConstant 4       # Offset 4
+LoadConstant 4       # Wert 4
+StoreHeap            # Speichere den Wert
+
+# Element 5
+Dup                  # Dupliziere die Referenz
+LoadConstant 5       # Offset 5
+LoadConstant 5       # Wert 5
+StoreHeap            # Speichere den Wert
+
+# Element 6
+Dup                  # Dupliziere die Referenz
+LoadConstant 6       # Offset 6
+LoadConstant 6       # Wert 6
+StoreHeap            # Speichere den Wert
+
+# Element 7
+Dup                  # Dupliziere die Referenz
+LoadConstant 7       # Offset 7
+LoadConstant 7       # Wert 7
+StoreHeap            # Speichere den Wert
+
+# Element 8
+Dup                  # Dupliziere die Referenz
+LoadConstant 8       # Offset 8
+LoadConstant 8       # Wert 8
+StoreHeap            # Speichere den Wert
+
+# Element 9
+Dup                  # Dupliziere die Referenz
+LoadConstant 9       # Offset 9
+LoadConstant 9       # Wert 9
+StoreHeap            # Speichere den Wert
+
+# Element 10
+Dup                  # Dupliziere die Referenz
+LoadConstant 10      # Offset 10
+LoadConstant 10      # Wert 10
+StoreHeap            # Speichere den Wert
+                     # Stack: [reference]
+
+# 5. Berechne die Summe aller Elemente im Array
+LoadConstant 0       # Initialisiere Summe mit 0
+                     # Stack: [reference, sum=0]
+
+# Lade die Länge aus dem Array (Offset 0)
+PickN 1              # Hole die Referenz
+                     # Stack: [reference, sum=0, reference]
+LoadConstant 0       # Offset 0
+LoadHeap             # Lade die Länge
+                     # Stack: [reference, sum=0, length=10]
+
+# Initialisiere den Index mit 1
+LoadConstant 1       # Lade den Startindex
+                     # Stack: [reference, sum=0, length=10, index=1]
+
+# Summen-Schleife
+# Schleifenkopf:
+# Stack: [reference, sum, length, index]
+
+# Label: LOOP_START
+# Prüfe, ob index <= length
+Dup                  # Dupliziere den Index
+                     # Stack: [reference, sum, length, index, index]
+PickN 2              # Hole die Länge
+                     # Stack: [reference, sum, length, index, index, length]
+Sub                  # length - index
+                     # Stack: [reference, sum, length, index, (length-index)]
+LoadConstant 0       # Lade 0 für Vergleich
+                     # Stack: [reference, sum, length, index, (length-index), 0]
+Sub                  # (length-index) - 0
+                     # Stack: [reference, sum, length, index, (length-index)]
+JumpIfZero LOOP_END  # Springe zu LOOP_END, wenn index > length
+
+# Hole den Wert an Position index
+PickN 3              # Hole die Referenz
+                     # Stack: [reference, sum, length, index, reference]
+PickN 1              # Hole den Index
+                     # Stack: [reference, sum, length, index, reference, index]
+LoadHeap             # Lade den Wert an index
+                     # Stack: [reference, sum, length, index, value]
+
+# Addiere den Wert zur Summe
+PickN 3              # Hole die Summe
+                     # Stack: [reference, sum, length, index, value, sum]
+Add                  # sum + value
+                     # Stack: [reference, sum, length, index, new_sum]
+
+# Tausche neue Summe mit altem Index
+PickN 1              # Hole den Index
+                     # Stack: [reference, sum, length, index, new_sum, index]
+Swap                 # Tausche new_sum und index
+                     # Stack: [reference, sum, length, index, index, new_sum]
+Drop                 # Entferne den alten Index
+                     # Stack: [reference, sum, length, index, new_sum]
+
+# Swap und Drop, um die alte Summe zu ersetzen
+PickN 3              # Hole die alte Summe
+                     # Stack: [reference, sum, length, index, new_sum, old_sum]
+Drop                 # Entferne die alte Summe
+                     # Stack: [reference, sum, length, index, new_sum]
+Swap                 # Tausche new_sum und index
+                     # Stack: [reference, sum, length, new_sum, index]
+Swap                 # Tausche index und length
+                     # Stack: [reference, sum, index, length, new_sum]
+Swap                 # Tausche new_sum und length
+                     # Stack: [reference, sum, index, new_sum, length]
+Swap                 # Tausche length und index
+                     # Stack: [reference, sum, new_sum, index, length]
+Swap                 # Tausche index und new_sum
+                     # Stack: [reference, sum, index, length, new_sum]
+Drop                 # Entferne new_sum
+                     # Stack: [reference, sum, index, length]
+
+# Erhöhe den Index um 1
+LoadConstant 1       # Lade 1 für Inkrementierung
+                     # Stack: [reference, sum, index, length, 1]
+PickN 2              # Hole den aktuellen Index
+                     # Stack: [reference, sum, index, length, 1, index]
+Add                  # index + 1
+                     # Stack: [reference, sum, index, length, new_index]
+
+# Ersetze den alten Index durch den neuen
+PickN 2              # Hole den alten Index
+                     # Stack: [reference, sum, index, length, new_index, old_index]
+Drop                 # Entferne den alten Index
+                     # Stack: [reference, sum, index, length, new_index]
+Swap                 # Tausche new_index und length
+                     # Stack: [reference, sum, index, new_index, length]
+Swap                 # Tausche length und index
+                     # Stack: [reference, sum, new_index, length, index]
+Drop                 # Entferne den alten Index
+                     # Stack: [reference, sum, new_index, length]
+
+# Zurück zum Schleifenbeginn
+JumpIfZero LOOP_START # Springe zurück zum Schleifenbeginn
+
+# Label: LOOP_END
+# Stack nach der Schleife: [reference, sum, length, index]
+
+# Bereinige den Stack und behalte nur die Summe
+Drop                 # Entferne den Index
+                     # Stack: [reference, sum, length]
+Drop                 # Entferne die Länge
+                     # Stack: [reference, sum]
+Swap                 # Tausche reference und sum
+                     # Stack: [sum, reference]
+
+# 6. Gib den Array-Zeiger frei
+Free                 # Gib den Speicher frei
+                     # Stack: [sum, free_result]
+Drop                 # Entferne das Free-Ergebnis
+                     # Stack: [sum]
+
+# 7. Gib die Summe aus
+Print                # Gib die Summe aus (sollte 55 sein für 1+2+3+...+10)
+                     # Stack: [] 

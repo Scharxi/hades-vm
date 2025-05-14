@@ -1,0 +1,84 @@
+# Einfaches Speicherverwaltungsbeispiel für die Hades-VM
+# --------------------------------------------
+# Dieses Programm demonstriert die grundlegenden Operationen:
+# - Alloc: Speicher allozieren
+# - StoreHeap: Werte im Speicher ablegen
+# - LoadHeap: Werte aus dem Speicher lesen
+# - MemSet: Speicherbereich initialisieren
+# - Free: Speicher freigeben
+
+# 1. Alloziere ein Array mit 5 Elementen
+LoadConstant 5       # Größe des Arrays
+Alloc                # Alloziere Speicher
+                     # Stack: [reference]
+
+# 2. Initialisiere den Speicher mit dem Wert 0
+Dup                  # Dupliziere die Referenz
+LoadConstant 5       # Anzahl der zu initialisierenden Elemente
+LoadConstant 0       # Initialwert (0)
+MemSet               # Initialisiere den Speicher
+                     # Stack: [reference]
+
+# 3. Speichere Werte im Array
+# Speichere 42 an Position 0
+Dup                  # Dupliziere die Referenz
+LoadConstant 0       # Position 0
+LoadConstant 42      # Wert 42
+StoreHeap            # Speichere den Wert
+                     # Stack: [reference]
+
+# Speichere 123 an Position 1
+Dup                  # Dupliziere die Referenz
+LoadConstant 1       # Position 1
+LoadConstant 123     # Wert 123
+StoreHeap            # Speichere den Wert
+                     # Stack: [reference]
+
+# Speichere 99 an Position 2
+Dup                  # Dupliziere die Referenz
+LoadConstant 2       # Position 2
+LoadConstant 99      # Wert 99
+StoreHeap            # Speichere den Wert
+                     # Stack: [reference]
+
+# 4. Lese Werte aus dem Array und gib sie aus
+# Lese Wert an Position 0
+Dup                  # Dupliziere die Referenz
+LoadConstant 0       # Position 0
+LoadHeap             # Lade den Wert
+Print                # Gibt "Integer: 42" aus
+                     # Stack: [reference]
+
+# Lese Wert an Position 1
+Dup                  # Dupliziere die Referenz
+LoadConstant 1       # Position 1
+LoadHeap             # Lade den Wert
+Print                # Gibt "Integer: 123" aus
+                     # Stack: [reference]
+
+# Lese Wert an Position 2
+Dup                  # Dupliziere die Referenz
+LoadConstant 2       # Position 2
+LoadHeap             # Lade den Wert
+Print                # Gibt "Integer: 99" aus
+                     # Stack: [reference]
+
+# 5. Ändere einen Wert im Array
+Dup                  # Dupliziere die Referenz
+LoadConstant 1       # Position 1
+LoadConstant 456     # Neuer Wert 456
+StoreHeap            # Speichere den neuen Wert
+                     # Stack: [reference]
+
+# Lese den geänderten Wert
+Dup                  # Dupliziere die Referenz
+LoadConstant 1       # Position 1
+LoadHeap             # Lade den geänderten Wert
+Print                # Gibt "Integer: 456" aus
+                     # Stack: [reference]
+
+# 6. Gib den Speicher frei
+Free                 # Gib den Speicher frei
+                     # Stack: [boolean]
+Print                # Gibt "Boolean: true" aus, wenn die Freigabe erfolgreich war
+                     # Stack: [] 
