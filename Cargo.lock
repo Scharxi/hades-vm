@@ -37,6 +37,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hades-ir-interpreter"
+version = "0.1.0"
+dependencies = [
+ "hades-ir",
+ "thiserror",
+ "vm",
+]
+
+[[package]]
 name = "hades-vm"
 version = "0.1.0"
 dependencies = [

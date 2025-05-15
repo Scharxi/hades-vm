@@ -1,0 +1,9 @@
+[package]
+name = "hades-ir-interpreter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hades-ir = { path = "../hades-ir" }
+vm = { path = "../vm" }
+thiserror = "1.0"
