@@ -107,6 +107,41 @@ impl ALU {
         }
         value >> shift
     }
+
+    /// Performs boolean AND operation.
+    pub fn bool_and(&self, a: bool, b: bool) -> bool {
+        a && b
+    }
+
+    /// Performs boolean OR operation.
+    pub fn bool_or(&self, a: bool, b: bool) -> bool {
+        a || b
+    }
+
+    /// Performs boolean XOR operation.
+    pub fn bool_xor(&self, a: bool, b: bool) -> bool {
+        a ^ b
+    }
+
+    /// Performs boolean NOT operation.
+    pub fn bool_not(&self, a: bool) -> bool {
+        !a
+    }
+
+    /// Performs equality comparison.
+    pub fn equal(&self, a: i32, b: i32) -> bool {
+        a == b
+    }
+
+    /// Performs inequality comparison.
+    pub fn not_equal(&self, a: i32, b: i32) -> bool {
+        a != b
+    }
+
+    /// Performs less than comparison.
+    pub fn less_than(&self, a: i32, b: i32) -> bool {
+        a < b
+    }
 }
 
 #[cfg(test)]
@@ -192,6 +227,51 @@ mod tests {
         // Test ShiftRight
         assert_eq!(alu.shift_right(4, 2), 1);
         assert_eq!(alu.shift_right(0b1010, 1), 0b0101);
+    }
+
+    #[test]
+    fn test_boolean_operations() {
+        let alu = ALU;
+        
+        // Test And
+        assert_eq!(alu.bool_and(true, true), true);
+        assert_eq!(alu.bool_and(true, false), false);
+        assert_eq!(alu.bool_and(false, true), false);
+        assert_eq!(alu.bool_and(false, false), false);
+        
+        // Test Or
+        assert_eq!(alu.bool_or(true, true), true);
+        assert_eq!(alu.bool_or(true, false), true);
+        assert_eq!(alu.bool_or(false, true), true);
+        assert_eq!(alu.bool_or(false, false), false);
+        
+        // Test Xor
+        assert_eq!(alu.bool_xor(true, true), false);
+        assert_eq!(alu.bool_xor(true, false), true);
+        assert_eq!(alu.bool_xor(false, true), true);
+        assert_eq!(alu.bool_xor(false, false), false);
+        
+        // Test Not
+        assert_eq!(alu.bool_not(true), false);
+        assert_eq!(alu.bool_not(false), true);
+    }
+
+    #[test]
+    fn test_comparison_operations() {
+        let alu = ALU;
+        
+        // Test Equal
+        assert_eq!(alu.equal(5, 5), true);
+        assert_eq!(alu.equal(5, 3), false);
+        
+        // Test NotEqual
+        assert_eq!(alu.not_equal(5, 5), false);
+        assert_eq!(alu.not_equal(5, 3), true);
+        
+        // Test LessThan
+        assert_eq!(alu.less_than(3, 5), true);
+        assert_eq!(alu.less_than(5, 3), false);
+        assert_eq!(alu.less_than(5, 5), false);
     }
 
     #[test]

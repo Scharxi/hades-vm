@@ -200,6 +200,34 @@ pub struct ShiftLeft;
 #[opcode = 0x18]
 pub struct ShiftRight;
 
+#[derive(IntoRaw)]
+#[opcode = 0x19]
+pub struct And;
+
+#[derive(IntoRaw)]
+#[opcode = 0x1A]
+pub struct Or;
+
+#[derive(IntoRaw)]
+#[opcode = 0x1B]
+pub struct Xor;
+
+#[derive(IntoRaw)]
+#[opcode = 0x1C]
+pub struct Not;
+
+#[derive(IntoRaw)]
+#[opcode = 0x1D]
+pub struct Equal;
+
+#[derive(IntoRaw)]
+#[opcode = 0x1E]
+pub struct NotEqual;
+
+#[derive(IntoRaw)]
+#[opcode = 0x1F]
+pub struct LessThan;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +413,51 @@ mod tests {
         let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
         assert_eq!(instruction.opcode, Opcode::ShiftRight);
         assert!(instruction.operands.is_empty());
+    }
+
+    #[test]
+    fn test_boolean_instructions() {
+        // Test And
+        let and = And;
+        let raw = and.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::And);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test Or
+        let or = Or;
+        let raw = or.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Or);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test Xor
+        let xor = Xor;
+        let raw = xor.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Xor);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test Not
+        let not = Not;
+        let raw = not.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Not);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test Equal
+        let equal = Equal;
+        let raw = equal.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Equal);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test NotEqual
+        let not_equal = NotEqual;
+        let raw = not_equal.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::NotEqual);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test LessThan
+        let less_than = LessThan;
+        let raw = less_than.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::LessThan);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
     }
 }
 

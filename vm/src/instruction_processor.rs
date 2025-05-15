@@ -967,6 +967,150 @@ impl InstructionExecutor {
                 }
                 ExecutionSignal::Continue
             }
+            Opcode::And => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("And instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Boolean(a_val), StackValue::Boolean(b_val)) => {
+                            let result = self.alu.bool_and(b_val, a_val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in And operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::Or => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Or instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Boolean(a_val), StackValue::Boolean(b_val)) => {
+                            let result = self.alu.bool_or(b_val, a_val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in Or operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::Xor => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Xor instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Boolean(a_val), StackValue::Boolean(b_val)) => {
+                            let result = self.alu.bool_xor(b_val, a_val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in Xor operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::Not => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Not instruction requires 0 operands");
+                }
+
+                if let Some(value) = stack.pop() {
+                    match value {
+                        StackValue::Boolean(val) => {
+                            let result = self.alu.bool_not(val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in Not operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::Equal => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("Equal instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                            let result = self.alu.equal(b_val, a_val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in Equal operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::NotEqual => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("NotEqual instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                            let result = self.alu.not_equal(b_val, a_val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in NotEqual operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::LessThan => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("LessThan instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                            let result = self.alu.less_than(b_val, a_val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in LessThan operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
             // --- Platzhalter für neue Opcodes ---
             // Sie müssen diese Opcodes zu Ihrer Opcode-Enum hinzufügen (vermutlich in opcode.rs)
             Opcode::Yield => {
@@ -1358,6 +1502,114 @@ mod tests {
         stack.push(StackValue::Integer(32)); // Invalid shift amount
         let instruction = Instruction {
             opcode: Opcode::ShiftLeft,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+    }
+
+    #[test]
+    fn test_boolean_instructions() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024);
+        let mut memory = SegmentedMemory::new(1024);
+
+        // Test And
+        stack.push(StackValue::Boolean(true));
+        stack.push(StackValue::Boolean(false));
+        let instruction = Instruction {
+            opcode: Opcode::And,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(false)));
+
+        // Test Or
+        stack.push(StackValue::Boolean(true));
+        stack.push(StackValue::Boolean(false));
+        let instruction = Instruction {
+            opcode: Opcode::Or,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(true)));
+
+        // Test Xor
+        stack.push(StackValue::Boolean(true));
+        stack.push(StackValue::Boolean(true));
+        let instruction = Instruction {
+            opcode: Opcode::Xor,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(false)));
+
+        // Test Not
+        stack.push(StackValue::Boolean(true));
+        let instruction = Instruction {
+            opcode: Opcode::Not,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(false)));
+
+        // Test Equal
+        stack.push(StackValue::Integer(5));
+        stack.push(StackValue::Integer(5));
+        let instruction = Instruction {
+            opcode: Opcode::Equal,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(true)));
+
+        // Test NotEqual
+        stack.push(StackValue::Integer(5));
+        stack.push(StackValue::Integer(3));
+        let instruction = Instruction {
+            opcode: Opcode::NotEqual,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(true)));
+
+        // Test LessThan
+        stack.push(StackValue::Integer(3));
+        stack.push(StackValue::Integer(5));
+        let instruction = Instruction {
+            opcode: Opcode::LessThan,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(true)));
+    }
+
+    #[test]
+    #[should_panic(expected = "Type mismatch in And operation")]
+    fn test_and_type_mismatch() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024);
+        let mut memory = SegmentedMemory::new(1024);
+
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Boolean(true));
+        let instruction = Instruction {
+            opcode: Opcode::And,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Type mismatch in Equal operation")]
+    fn test_equal_type_mismatch() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024);
+        let mut memory = SegmentedMemory::new(1024);
+
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Boolean(true));
+        let instruction = Instruction {
+            opcode: Opcode::Equal,
             operands: vec![],
         };
         executor.execute(&instruction, &mut stack, &mut memory, 0);
