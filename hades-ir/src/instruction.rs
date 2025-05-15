@@ -100,6 +100,18 @@ pub enum Operation {
     Select,
     /// Print a value (for debugging)
     Print,
+
+    // String operations
+    /// Concatenate two strings
+    StringConcat,
+    /// Get string length
+    StringLength,
+    /// Get substring
+    StringSubstring,
+    /// Compare strings
+    StringCompare,
+    /// Check if string contains substring
+    StringContains,
 }
 
 impl fmt::Display for Operation {
@@ -156,6 +168,13 @@ impl fmt::Display for Operation {
             Operation::Phi => write!(f, "phi"),
             Operation::Select => write!(f, "select"),
             Operation::Print => write!(f, "print"),
+
+            // String operations
+            Operation::StringConcat => write!(f, "strcat"),
+            Operation::StringLength => write!(f, "strlen"),
+            Operation::StringSubstring => write!(f, "substr"),
+            Operation::StringCompare => write!(f, "strcmp"),
+            Operation::StringContains => write!(f, "strcontains"),
         }
     }
 }
@@ -313,6 +332,31 @@ impl Instruction {
     /// Creates a print instruction (for debugging)
     pub fn print(value: Value) -> Self {
         Self::new(Operation::Print, vec![value], None)
+    }
+
+    /// Creates a string concatenation instruction
+    pub fn string_concat(lhs: Value, rhs: Value) -> Self {
+        Self::new(Operation::StringConcat, vec![lhs, rhs], Some(Type::string()))
+    }
+
+    /// Creates a string length instruction
+    pub fn string_length(str: Value) -> Self {
+        Self::new(Operation::StringLength, vec![str], Some(Type::i32()))
+    }
+
+    /// Creates a substring instruction
+    pub fn string_substring(str: Value, start: Value, length: Value) -> Self {
+        Self::new(Operation::StringSubstring, vec![str, start, length], Some(Type::string()))
+    }
+
+    /// Creates a string comparison instruction
+    pub fn string_compare(lhs: Value, rhs: Value) -> Self {
+        Self::new(Operation::StringCompare, vec![lhs, rhs], Some(Type::i32()))
+    }
+
+    /// Creates a string contains instruction
+    pub fn string_contains(str: Value, substr: Value) -> Self {
+        Self::new(Operation::StringContains, vec![str, substr], Some(Type::boolean()))
     }
 }
 

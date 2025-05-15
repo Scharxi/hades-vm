@@ -128,6 +128,12 @@ pub enum Value {
         /// The type of the undefined value
         ty: Arc<Type>,
     },
+    
+    /// A string constant
+    StringConstant {
+        /// The value of the constant
+        value: String,
+    },
 }
 
 impl Value {
@@ -145,6 +151,7 @@ impl Value {
             Value::Instruction { id, .. } => *id,
             Value::BasicBlock { id, .. } => *id,
             Value::Undefined { id, .. } => *id,
+            Value::StringConstant { .. } => ValueId::new(),
         }
     }
     
@@ -162,6 +169,7 @@ impl Value {
             Value::Instruction { ty, .. } => Some(ty.clone()),
             Value::BasicBlock { .. } => None, // Basic blocks don't have a proper type
             Value::Undefined { ty, .. } => Some(ty.clone()),
+            Value::StringConstant { .. } => Some(Type::string()),
         }
     }
     
@@ -243,6 +251,13 @@ impl Value {
         }
     }
     
+    /// Create a new string constant
+    pub fn string_constant(value: &str) -> Self {
+        Self::StringConstant {
+            value: value.to_string(),
+        }
+    }
+    
     /// Check if this value is a constant
     pub fn is_constant(&self) -> bool {
         matches!(
@@ -252,6 +267,7 @@ impl Value {
                 | Value::BooleanConstant { .. }
                 | Value::CharConstant { .. }
                 | Value::NullPointer { .. }
+                | Value::StringConstant { .. }
         )
     }
     
@@ -282,10 +298,10 @@ impl fmt::Display for Value {
             Value::IntegerConstant { value, .. } => write!(f, "{}", value),
             Value::FloatConstant { value, .. } => write!(f, "{}", value),
             Value::BooleanConstant { value } => write!(f, "{}", value),
-            Value::CharConstant { value } => write!(f, "'{}'", value),
+            Value::CharConstant { value } => write!(f, "'{}'", value.escape_debug()),
             Value::NullPointer { .. } => write!(f, "null"),
             Value::GlobalVariable { name, .. } => write!(f, "@{}", name),
-            Value::Argument { name, id, .. } => {
+            Value::Argument { id, name, .. } => {
                 if let Some(name) = name {
                     write!(f, "%{}", name)
                 } else {
@@ -294,14 +310,15 @@ impl fmt::Display for Value {
             }
             Value::Function { name, .. } => write!(f, "@{}", name),
             Value::Instruction { id, .. } => write!(f, "{}", id),
-            Value::BasicBlock { name, id } => {
+            Value::BasicBlock { id, name } => {
                 if let Some(name) = name {
                     write!(f, "label %{}", name)
                 } else {
                     write!(f, "label {}", id)
                 }
             }
-            Value::Undefined { .. } => write!(f, "undef"),
+            Value::Undefined { id, .. } => write!(f, "{}", id),
+            Value::StringConstant { value } => write!(f, "\"{}\"", value.escape_debug()),
         }
     }
 } 

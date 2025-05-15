@@ -228,6 +228,26 @@ pub struct NotEqual;
 #[opcode = 0x1F]
 pub struct LessThan;
 
+#[derive(IntoRaw)]
+#[opcode = 0x30]
+pub struct StringConcat;
+
+#[derive(IntoRaw)]
+#[opcode = 0x31]
+pub struct StringLength;
+
+#[derive(IntoRaw)]
+#[opcode = 0x32]
+pub struct StringSubstring(pub i32, pub i32); // start, length
+
+#[derive(IntoRaw)]
+#[opcode = 0x33]
+pub struct StringCompare;
+
+#[derive(IntoRaw)]
+#[opcode = 0x34]
+pub struct StringContains;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -457,6 +477,43 @@ mod tests {
         let less_than = LessThan;
         let raw = less_than.into_raw();
         assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::LessThan);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+    }
+
+    #[test]
+    fn test_string_instructions() {
+        // Test StringConcat
+        let concat = StringConcat;
+        let raw = concat.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::StringConcat);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test StringLength
+        let length = StringLength;
+        let raw = length.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::StringLength);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test StringSubstring
+        let substring = StringSubstring(5, 10); // start=5, length=10
+        let raw = substring.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::StringSubstring);
+        assert!(raw.has_operands().expect("Failed to check operands"));
+        let operands = raw.get_operands().expect("Failed to get operands");
+        assert_eq!(operands.len(), 2);
+        assert_eq!(operands[0], 5);
+        assert_eq!(operands[1], 10);
+
+        // Test StringCompare
+        let compare = StringCompare;
+        let raw = compare.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::StringCompare);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test StringContains
+        let contains = StringContains;
+        let raw = contains.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::StringContains);
         assert!(!raw.has_operands().expect("Failed to check operands"));
     }
 }

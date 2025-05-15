@@ -19,6 +19,9 @@ pub enum Type {
     /// Character type
     Char,
     
+    /// String type
+    String,
+    
     /// Pointer to another type
     Pointer(Arc<Type>),
     
@@ -126,6 +129,11 @@ impl Type {
         Arc::new(Type::Named(name.to_string()))
     }
     
+    /// Create a new string type
+    pub fn string() -> Arc<Self> {
+        Arc::new(Type::String)
+    }
+    
     /// Returns the size of the type in bytes
     pub fn size_in_bytes(&self) -> Option<usize> {
         match self {
@@ -134,6 +142,7 @@ impl Type {
             Type::Float(bits) => Some((bits / 8) as usize),
             Type::Boolean => Some(1),
             Type::Char => Some(4), // Assuming Unicode character
+            Type::String => None, // String size is dynamic
             Type::Pointer(_) => Some(8), // Assuming 64-bit pointers
             Type::Array { element_type, size } => {
                 element_type.size_in_bytes().map(|s| s * size)
@@ -187,6 +196,14 @@ impl Type {
             // Pointer to integer casts
             (Type::Pointer(_), Type::Integer(_)) => true,
             
+            // String to string casts
+            (Type::String, Type::String) => true,
+            
+            // String to pointer casts (for C-style strings)
+            (Type::String, Type::Pointer(pointee)) => {
+                matches!(**pointee, Type::Char)
+            },
+            
             // Anything else is not allowed
             _ => false,
         }
@@ -201,6 +218,7 @@ impl fmt::Display for Type {
             Type::Float(bits) => write!(f, "f{}", bits),
             Type::Boolean => write!(f, "bool"),
             Type::Char => write!(f, "char"),
+            Type::String => write!(f, "string"),
             Type::Pointer(pointee) => write!(f, "{}*", pointee),
             Type::Function { return_type, param_types, is_variadic } => {
                 write!(f, "{} (", return_type)?;
