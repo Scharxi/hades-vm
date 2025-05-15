@@ -33,7 +33,25 @@ impl<'a> Lexer<'a> {
             Some(c) => {
                 match c {
                     '0'..='9' => self.read_number(),
-                    'a'..='z' | 'A'..='Z' | '_' => self.read_identifier(),
+                    'a'..='z' | 'A'..='Z' => self.read_identifier(),
+                    '_' => {
+                        self.advance();
+                        if let Some(next) = self.peek() {
+                            if next.is_alphanumeric() || next == '_' {
+                                let mut identifier = String::from("_");
+                                while let Some(c) = self.peek() {
+                                    if c.is_alphanumeric() || c == '_' {
+                                        identifier.push(c);
+                                        self.advance();
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                return self.create_token(TokenKind::Identifier(identifier), start_pos, start_line, start_column);
+                            }
+                        }
+                        self.create_token(TokenKind::Underscore, start_pos, start_line, start_column)
+                    },
                     '"' => self.read_string(),
                     '+' => self.single_char_token(TokenKind::Plus),
                     '-' => self.read_minus_or_arrow(),
@@ -42,6 +60,88 @@ impl<'a> Lexer<'a> {
                     '=' => self.read_equals(),
                     '<' => self.read_less_than(),
                     '>' => self.read_greater_than(),
+                    '|' => {
+                        self.advance();
+                        match self.peek() {
+                            Some('|') => {
+                                self.advance();
+                                self.create_token(TokenKind::Or, start_pos, start_line, start_column)
+                            }
+                            Some('!') => {
+                                self.advance();
+                                Token::error("unexpected '!' after '|'", Span {
+                                    start: start_pos,
+                                    end: self.position,
+                                    line: start_line,
+                                    column: start_column,
+                                })
+                            }
+                            Some(c) => {
+                                Token::error(format!("unexpected character after '|': {}", c), Span {
+                                    start: start_pos,
+                                    end: self.position + 1,
+                                    line: start_line,
+                                    column: start_column,
+                                })
+                            }
+                            None => Token::error("Expected '|' after '|'", Span {
+                                start: start_pos,
+                                end: self.position,
+                                line: start_line,
+                                column: start_column,
+                            })
+                        }
+                    },
+                    '&' => {
+                        self.advance();
+                        match self.peek() {
+                            Some('&') => {
+                                self.advance();
+                                self.create_token(TokenKind::And, start_pos, start_line, start_column)
+                            }
+                            Some('!') => {
+                                self.advance();
+                                Token::error("unexpected '!' after '&'", Span {
+                                    start: start_pos,
+                                    end: self.position,
+                                    line: start_line,
+                                    column: start_column,
+                                })
+                            }
+                            Some(c) => {
+                                Token::error(format!("unexpected character after '&': {}", c), Span {
+                                    start: start_pos,
+                                    end: self.position + 1,
+                                    line: start_line,
+                                    column: start_column,
+                                })
+                            }
+                            None => Token::error("Expected '&' after '&'", Span {
+                                start: start_pos,
+                                end: self.position,
+                                line: start_line,
+                                column: start_column,
+                            })
+                        }
+                    },
+                    '!' => {
+                        self.advance();
+                        match self.peek() {
+                            Some('=') => {
+                                self.advance();
+                                self.create_token(TokenKind::NotEq, start_pos, start_line, start_column)
+                            }
+                            Some(c) if !c.is_whitespace() => {
+                                Token::error(format!("unexpected character after '!': {}", c), Span {
+                                    start: start_pos,
+                                    end: self.position + 1,
+                                    line: start_line,
+                                    column: start_column,
+                                })
+                            }
+                            _ => self.create_token(TokenKind::Not, start_pos, start_line, start_column)
+                        }
+                    },
                     '(' => self.single_char_token(TokenKind::LParen),
                     ')' => self.single_char_token(TokenKind::RParen),
                     '{' => self.single_char_token(TokenKind::LBrace),
@@ -153,6 +253,9 @@ impl<'a> Lexer<'a> {
             "struct" => TokenKind::Struct,
             "async" => TokenKind::Async,
             "await" => TokenKind::Await,
+            "type" => TokenKind::Type,
+            "const" => TokenKind::Const,
+            "for" => TokenKind::For,
             "true" => TokenKind::Boolean(true),
             "false" => TokenKind::Boolean(false),
             _ => TokenKind::Identifier(identifier),
@@ -355,6 +458,14 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Token;
+    
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.next_token())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,7 +508,7 @@ mod tests {
 
     #[test]
     fn test_operators() {
-        let input = "+ - * / = == => -> < > <= >=";
+        let input = "+ - * / = == => -> < > <= >= != && ||";
         let mut lexer = Lexer::new(input);
         
         assert_eq!(lexer.next_token().kind, TokenKind::Plus);
@@ -412,6 +523,308 @@ mod tests {
         assert_eq!(lexer.next_token().kind, TokenKind::Gt);
         assert_eq!(lexer.next_token().kind, TokenKind::LtEq);
         assert_eq!(lexer.next_token().kind, TokenKind::GtEq);
+        assert_eq!(lexer.next_token().kind, TokenKind::NotEq);
+        assert_eq!(lexer.next_token().kind, TokenKind::And);
+        assert_eq!(lexer.next_token().kind, TokenKind::Or);
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_string_escapes() {
+        let input = r#""Hello\nWorld" "Tab\there" "Quote\"here" "Backslash\\""#;
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::String("Hello\nWorld".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::String("Tab\there".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::String("Quote\"here".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::String("Backslash\\".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_invalid_string() {
+        let input = r#""unterminated"#;
+        let mut lexer = Lexer::new(input);
+        
+        match lexer.next_token().kind {
+            TokenKind::Error(_) => (),
+            other => panic!("Expected error token, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_identifiers() {
+        let input = "foo bar_baz _hidden camelCase UPPERCASE";
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("foo".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("bar_baz".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("_hidden".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("camelCase".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("UPPERCASE".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_numbers() {
+        let input = "42 3.14159 0.123 123.456 0 -42 -3.14";
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Integer(42));
+        assert_eq!(lexer.next_token().kind, TokenKind::Float(3.14159));
+        assert_eq!(lexer.next_token().kind, TokenKind::Float(0.123));
+        assert_eq!(lexer.next_token().kind, TokenKind::Float(123.456));
+        assert_eq!(lexer.next_token().kind, TokenKind::Integer(0));
+        assert_eq!(lexer.next_token().kind, TokenKind::Minus);
+        assert_eq!(lexer.next_token().kind, TokenKind::Integer(42));
+        assert_eq!(lexer.next_token().kind, TokenKind::Minus);
+        assert_eq!(lexer.next_token().kind, TokenKind::Float(3.14));
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_delimiters() {
+        let input = "( ) { } [ ] , . : ;";
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::LParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::RParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBracket);
+        assert_eq!(lexer.next_token().kind, TokenKind::RBracket);
+        assert_eq!(lexer.next_token().kind, TokenKind::Comma);
+        assert_eq!(lexer.next_token().kind, TokenKind::Dot);
+        assert_eq!(lexer.next_token().kind, TokenKind::Colon);
+        assert_eq!(lexer.next_token().kind, TokenKind::Semicolon);
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_complex_code() {
+        let input = r#"
+            fn factorial(n: i32) -> i32 {
+                when (n) {
+                    0 => { return 1; }
+                    n => { return n * factorial(n - 1); }
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(input);
+        
+        // Function declaration
+        assert_eq!(lexer.next_token().kind, TokenKind::Fn);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("factorial".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::LParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("n".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Colon);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("i32".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::RParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Arrow);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("i32".to_string()));
+        
+        // Function body
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::When);
+        assert_eq!(lexer.next_token().kind, TokenKind::LParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("n".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::RParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        
+        // First when arm
+        assert_eq!(lexer.next_token().kind, TokenKind::Integer(0));
+        assert_eq!(lexer.next_token().kind, TokenKind::FatArrow);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::Return);
+        assert_eq!(lexer.next_token().kind, TokenKind::Integer(1));
+        assert_eq!(lexer.next_token().kind, TokenKind::Semicolon);
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        
+        // Second when arm
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("n".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::FatArrow);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::Return);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("n".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Star);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("factorial".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::LParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("n".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Minus);
+        assert_eq!(lexer.next_token().kind, TokenKind::Integer(1));
+        assert_eq!(lexer.next_token().kind, TokenKind::RParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Semicolon);
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        
+        // Closing braces
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_logical_operators() {
+        let input = "! && || != true false";
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Not);
+        assert_eq!(lexer.next_token().kind, TokenKind::And);
+        assert_eq!(lexer.next_token().kind, TokenKind::Or);
+        assert_eq!(lexer.next_token().kind, TokenKind::NotEq);
+        assert_eq!(lexer.next_token().kind, TokenKind::Boolean(true));
+        assert_eq!(lexer.next_token().kind, TokenKind::Boolean(false));
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_invalid_operators() {
+        let input = "& | &! |!";
+        let mut lexer = Lexer::new(input);
+        
+        match lexer.next_token().kind {
+            TokenKind::Error(_) => (),
+            other => panic!("Expected error token for single '&', got {:?}", other),
+        }
+        
+        match lexer.next_token().kind {
+            TokenKind::Error(_) => (),
+            other => panic!("Expected error token for single '|', got {:?}", other),
+        }
+        
+        match lexer.next_token().kind {
+            TokenKind::Error(_) => (),
+            other => panic!("Expected error token for '&!', got {:?}", other),
+        }
+        
+        match lexer.next_token().kind {
+            TokenKind::Error(_) => (),
+            other => panic!("Expected error token for '|!', got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_pattern_matching() {
+        let input = r#"
+            when (value) {
+                is String => { "it's a string" }
+                _ => { "wildcard" }
+            }
+        "#;
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::When);
+        assert_eq!(lexer.next_token().kind, TokenKind::LParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("value".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::RParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Is);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("String".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::FatArrow);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::String("it's a string".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Underscore);
+        assert_eq!(lexer.next_token().kind, TokenKind::FatArrow);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::String("wildcard".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_async_function() {
+        let input = r#"
+            async fn fetch_data() -> Result<String, Error> {
+                let response = http.get("https://api.example.com").await;
+                return response;
+            }
+        "#;
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Async);
+        assert_eq!(lexer.next_token().kind, TokenKind::Fn);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("fetch_data".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::LParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::RParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Arrow);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("Result".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Lt);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("String".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Comma);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("Error".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Gt);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Let);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("response".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Assign);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("http".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Dot);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("get".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::LParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::String("https://api.example.com".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::RParen);
+        assert_eq!(lexer.next_token().kind, TokenKind::Dot);
+        assert_eq!(lexer.next_token().kind, TokenKind::Await);
+        assert_eq!(lexer.next_token().kind, TokenKind::Semicolon);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Return);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("response".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Semicolon);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_struct_definition() {
+        let input = r#"
+            struct User<T> {
+                name: String,
+                age: i32,
+                data: T,
+                mut settings: HashMap<String, bool>
+            }
+        "#;
+        let mut lexer = Lexer::new(input);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Struct);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("User".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Lt);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("T".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Gt);
+        assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("name".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Colon);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("String".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Comma);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("age".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Colon);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("i32".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Comma);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("data".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Colon);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("T".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Comma);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::Mut);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("settings".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Colon);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("HashMap".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Lt);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("String".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Comma);
+        assert_eq!(lexer.next_token().kind, TokenKind::Identifier("bool".to_string()));
+        assert_eq!(lexer.next_token().kind, TokenKind::Gt);
+        
+        assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
         assert_eq!(lexer.next_token().kind, TokenKind::EOF);
     }
 } 

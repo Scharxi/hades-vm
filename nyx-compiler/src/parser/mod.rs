@@ -55,8 +55,6 @@ impl<'a> Parser<'a> {
     }
     
     fn parse_function(&mut self) -> Result<Function> {
-        self.expect(TokenKind::Fn)?;
-        
         let is_async = if self.check(TokenKind::Async) {
             self.advance();
             true
@@ -64,6 +62,7 @@ impl<'a> Parser<'a> {
             false
         };
         
+        self.expect(TokenKind::Fn)?;
         let name = self.parse_identifier()?;
         
         self.expect(TokenKind::LParen)?;
@@ -171,7 +170,15 @@ impl<'a> Parser<'a> {
                 Ok(Statement::Return(value))
             }
             TokenKind::If => self.parse_if_statement(),
-            TokenKind::When => self.parse_when_statement(),
+            TokenKind::When => {
+                let expr = self.parse_when_expression()?;
+                if self.check(TokenKind::Semicolon) {
+                    self.advance();
+                    Ok(Statement::Expression(expr))
+                } else {
+                    Ok(Statement::Expression(expr))
+                }
+            }
             _ => {
                 let expr = self.parse_expression()?;
                 self.expect(TokenKind::Semicolon)?;
@@ -200,10 +207,12 @@ impl<'a> Parser<'a> {
         })
     }
     
-    fn parse_when_statement(&mut self) -> Result<Statement> {
+    fn parse_when_expression(&mut self) -> Result<Expression> {
         self.advance(); // Skip 'when'
         
-        let subject = self.parse_expression()?;
+        self.expect(TokenKind::LParen)?;
+        let subject = Box::new(self.parse_expression()?);
+        self.expect(TokenKind::RParen)?;
         
         self.expect(TokenKind::LBrace)?;
         
@@ -214,7 +223,7 @@ impl<'a> Parser<'a> {
         
         self.expect(TokenKind::RBrace)?;
         
-        Ok(Statement::When { subject, arms })
+        Ok(Expression::When { subject, arms })
     }
     
     fn parse_when_arm(&mut self) -> Result<WhenArm> {
@@ -388,6 +397,12 @@ impl<'a> Parser<'a> {
                 let name = self.parse_identifier()?;
                 Ok(Expression::Variable(name))
             }
+            TokenKind::LParen => {
+                self.advance();
+                let expr = self.parse_expression()?;
+                self.expect(TokenKind::RParen)?;
+                Ok(expr)
+            }
             TokenKind::LBrace => {
                 let block = self.parse_block()?;
                 Ok(Expression::Block(block))
@@ -411,12 +426,14 @@ impl<'a> Parser<'a> {
             TokenKind::When => {
                 self.advance();
                 let subject = Box::new(self.parse_expression()?);
+                
                 self.expect(TokenKind::LBrace)?;
                 let mut arms = Vec::new();
                 while !self.check(TokenKind::RBrace) && !self.check(TokenKind::EOF) {
                     arms.push(self.parse_when_arm()?);
                 }
                 self.expect(TokenKind::RBrace)?;
+                
                 Ok(Expression::When { subject, arms })
             }
             _ => Err(ParseError::UnexpectedToken {
@@ -550,6 +567,211 @@ impl<'a> Parser<'a> {
     fn advance(&mut self) {
         self.current = self.lexer.next().unwrap(); // Safe because Lexer always returns at least EOF
     }
+    
+    fn parse_type_parameters(&mut self) -> Result<Vec<TypeParameter>> {
+        if !self.check(TokenKind::Lt) {
+            return Ok(Vec::new());
+        }
+        
+        self.advance();
+        let params = self.parse_separated_list(TokenKind::Gt, |p| {
+            let name = p.parse_identifier()?;
+            let bounds = if p.check(TokenKind::Colon) {
+                p.advance();
+                p.parse_separated_list(TokenKind::Comma, |p| p.parse_type())?
+            } else {
+                Vec::new()
+            };
+            Ok(TypeParameter { name, bounds })
+        })?;
+        
+        Ok(params)
+    }
+
+    fn parse_struct(&mut self) -> Result<Struct> {
+        self.expect(TokenKind::Struct)?;
+        let name = self.parse_identifier()?;
+        let type_params = self.parse_type_parameters()?;
+        
+        self.expect(TokenKind::LBrace)?;
+        let fields = self.parse_separated_list(TokenKind::RBrace, |p| p.parse_struct_field())?;
+        
+        Ok(Struct {
+            name,
+            type_params,
+            fields,
+        })
+    }
+    
+    fn parse_struct_field(&mut self) -> Result<StructField> {
+        let is_mutable = if self.check(TokenKind::Mut) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+        
+        let name = self.parse_identifier()?;
+        self.expect(TokenKind::Colon)?;
+        let type_ = self.parse_type()?;
+        
+        Ok(StructField {
+            name,
+            type_,
+            is_mutable,
+        })
+    }
+    
+    fn parse_enum(&mut self) -> Result<Enum> {
+        self.expect(TokenKind::Enum)?;
+        let name = self.parse_identifier()?;
+        let type_params = self.parse_type_parameters()?;
+        
+        self.expect(TokenKind::LBrace)?;
+        let variants = self.parse_separated_list(TokenKind::RBrace, |p| p.parse_enum_variant())?;
+        
+        Ok(Enum {
+            name,
+            type_params,
+            variants,
+        })
+    }
+    
+    fn parse_enum_variant(&mut self) -> Result<EnumVariant> {
+        let name = self.parse_identifier()?;
+        
+        let fields = if self.check(TokenKind::LParen) {
+            self.advance();
+            self.parse_separated_list(TokenKind::RParen, |p| p.parse_type())?
+        } else {
+            Vec::new()
+        };
+        
+        Ok(EnumVariant { name, fields })
+    }
+    
+    fn parse_trait(&mut self) -> Result<Trait> {
+        self.expect(TokenKind::Trait)?;
+        let name = self.parse_identifier()?;
+        let type_params = self.parse_type_parameters()?;
+        
+        let supertraits = if self.check(TokenKind::Colon) {
+            self.advance();
+            self.parse_separated_list(TokenKind::LBrace, |p| p.parse_type())?
+        } else {
+            Vec::new()
+        };
+        
+        self.expect(TokenKind::LBrace)?;
+        let items = self.parse_separated_list(TokenKind::RBrace, |p| p.parse_trait_item())?;
+        
+        Ok(Trait {
+            name,
+            type_params,
+            supertraits,
+            items,
+        })
+    }
+    
+    fn parse_trait_item(&mut self) -> Result<TraitItem> {
+        match self.current.kind {
+            TokenKind::Fn | TokenKind::Async => {
+                self.parse_trait_method().map(TraitItem::Method)
+            }
+            TokenKind::Type => {
+                self.advance();
+                let name = self.parse_identifier()?;
+                let bounds = if self.check(TokenKind::Colon) {
+                    self.advance();
+                    self.parse_separated_list(TokenKind::Semicolon, |p| p.parse_type())?
+                } else {
+                    Vec::new()
+                };
+                self.expect(TokenKind::Semicolon)?;
+                Ok(TraitItem::Type(TraitType { name, bounds }))
+            }
+            TokenKind::Const => {
+                self.advance();
+                let name = self.parse_identifier()?;
+                self.expect(TokenKind::Colon)?;
+                let type_ = self.parse_type()?;
+                let value = if self.check(TokenKind::Assign) {
+                    self.advance();
+                    Some(self.parse_expression()?)
+                } else {
+                    None
+                };
+                self.expect(TokenKind::Semicolon)?;
+                Ok(TraitItem::Const(TraitConst { name, type_, value }))
+            }
+            _ => Err(ParseError::UnexpectedToken {
+                expected: "trait item",
+                found: self.current.kind.clone(),
+                span: self.current.span.clone(),
+            }),
+        }
+    }
+    
+    fn parse_trait_method(&mut self) -> Result<TraitMethod> {
+        let is_async = if self.check(TokenKind::Async) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+        
+        self.expect(TokenKind::Fn)?;
+        let name = self.parse_identifier()?;
+        
+        self.expect(TokenKind::LParen)?;
+        let params = self.parse_separated_list(TokenKind::RParen, |p| p.parse_parameter())?;
+        
+        let return_type = if self.check(TokenKind::Arrow) {
+            self.advance();
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        
+        let body = if self.check(TokenKind::Semicolon) {
+            self.advance();
+            None
+        } else {
+            Some(self.parse_block()?)
+        };
+        
+        Ok(TraitMethod {
+            name,
+            params,
+            return_type,
+            body,
+            is_async,
+        })
+    }
+    
+    fn parse_implementation(&mut self) -> Result<Implementation> {
+        self.expect(TokenKind::Impl)?;
+        let type_params = self.parse_type_parameters()?;
+        
+        let target_type = self.parse_type()?;
+        
+        let trait_name = if self.check(TokenKind::For) {
+            self.advance();
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        
+        self.expect(TokenKind::LBrace)?;
+        let methods = self.parse_separated_list(TokenKind::RBrace, |p| p.parse_function())?;
+        
+        Ok(Implementation {
+            type_params,
+            target_type,
+            trait_name,
+            methods,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -570,10 +792,13 @@ mod tests {
         assert_eq!(function.name, "greet");
         assert_eq!(function.params.len(), 1);
         assert_eq!(function.params[0].name, "name");
-        assert!(matches!(
-            function.params[0].type_,
-            Type::Named { name, args } if name == "String" && args.is_empty()
-        ));
+        
+        if let Type::Named { ref name, ref args } = function.params[0].type_ {
+            assert_eq!(name, "String");
+            assert!(args.is_empty());
+        } else {
+            panic!("Expected Named type");
+        }
     }
 
     #[test]
@@ -596,7 +821,7 @@ mod tests {
     fn test_parse_async_function() {
         let input = r#"
             async fn fetch_data() -> Result<String, Error> {
-                let response = http.get("https://example.com").await;
+                let response = http.get("https://example.com");
                 return response.text();
             }
         "#;

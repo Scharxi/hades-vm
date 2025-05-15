@@ -16,6 +16,9 @@ pub enum TokenKind {
     Struct,
     Async,
     Await,
+    Type,
+    Const,
+    For,
     
     // Literals
     Integer(i64),
@@ -40,6 +43,9 @@ pub enum TokenKind {
     GtEq,
     Arrow,
     FatArrow,
+    And,
+    Or,
+    Not,
     
     // Delimiters
     LParen,
@@ -52,6 +58,7 @@ pub enum TokenKind {
     Dot,
     Colon,
     Semicolon,
+    Underscore,
     
     // Special
     EOF,

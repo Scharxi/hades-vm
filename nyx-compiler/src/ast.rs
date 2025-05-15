@@ -1,4 +1,80 @@
-use std::sync::Arc;
+#[derive(Debug, Clone)]
+pub struct TypeParameter {
+    pub name: String,
+    pub bounds: Vec<Type>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Struct {
+    pub name: String,
+    pub type_params: Vec<TypeParameter>,
+    pub fields: Vec<StructField>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructField {
+    pub name: String,
+    pub type_: Type,
+    pub is_mutable: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Enum {
+    pub name: String,
+    pub type_params: Vec<TypeParameter>,
+    pub variants: Vec<EnumVariant>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumVariant {
+    pub name: String,
+    pub fields: Vec<Type>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Trait {
+    pub name: String,
+    pub type_params: Vec<TypeParameter>,
+    pub supertraits: Vec<Type>,
+    pub items: Vec<TraitItem>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TraitItem {
+    Method(TraitMethod),
+    Type(TraitType),
+    Const(TraitConst),
+}
+
+#[derive(Debug, Clone)]
+pub struct TraitMethod {
+    pub name: String,
+    pub params: Vec<Parameter>,
+    pub return_type: Option<Type>,
+    pub body: Option<Block>,
+    pub is_async: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TraitType {
+    pub name: String,
+    pub bounds: Vec<Type>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TraitConst {
+    pub name: String,
+    pub type_: Type,
+    pub value: Option<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Implementation {
+    pub type_params: Vec<TypeParameter>,
+    pub target_type: Type,
+    pub trait_name: Option<Type>,
+    pub methods: Vec<Function>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -43,8 +119,8 @@ pub enum Statement {
         initializer: Option<Expression>,
         is_mutable: bool,
     },
-    Expression(Expression),
     Return(Option<Expression>),
+    Expression(Expression),
     If {
         condition: Expression,
         then_branch: Block,
@@ -111,10 +187,6 @@ pub enum Expression {
         subject: Box<Expression>,
         arms: Vec<WhenArm>,
     },
-    Lambda {
-        params: Vec<Parameter>,
-        body: Box<Expression>,
-    },
     Await(Box<Expression>),
 }
 
@@ -138,8 +210,6 @@ pub enum BinaryOp {
     LtEq,
     Gt,
     GtEq,
-    And,
-    Or,
 }
 
 #[derive(Debug, Clone)]
@@ -149,106 +219,14 @@ pub enum UnaryOp {
 }
 
 #[derive(Debug, Clone)]
-pub struct Struct {
-    pub name: String,
-    pub fields: Vec<Field>,
-    pub type_params: Vec<TypeParameter>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Field {
-    pub name: String,
-    pub type_: Type,
-    pub is_mutable: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct Enum {
-    pub name: String,
-    pub variants: Vec<Variant>,
-    pub type_params: Vec<TypeParameter>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Variant {
-    pub name: String,
-    pub fields: Vec<Field>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Trait {
-    pub name: String,
-    pub type_params: Vec<TypeParameter>,
-    pub supertraits: Vec<Type>,
-    pub items: Vec<TraitItem>,
-}
-
-#[derive(Debug, Clone)]
-pub enum TraitItem {
-    Function(Function),
-    Type {
-        name: String,
-        bounds: Vec<Type>,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub struct Implementation {
-    pub trait_: Option<Type>,
-    pub self_type: Type,
-    pub type_params: Vec<TypeParameter>,
-    pub items: Vec<ImplItem>,
-}
-
-#[derive(Debug, Clone)]
-pub enum ImplItem {
-    Function(Function),
-    Type {
-        name: String,
-        type_: Type,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Named {
         name: String,
         args: Vec<Type>,
     },
+    Tuple(Vec<Type>),
     Function {
         params: Vec<Type>,
         return_type: Box<Type>,
     },
-    Tuple(Vec<Type>),
-    Reference {
-        type_: Box<Type>,
-        is_mutable: bool,
-    },
-    TypeParameter(String),
-}
-
-#[derive(Debug, Clone)]
-pub struct TypeParameter {
-    pub name: String,
-    pub bounds: Vec<Type>,
-}
-
-impl Type {
-    pub fn unit() -> Self {
-        Type::Tuple(vec![])
-    }
-    
-    pub fn option(inner: Type) -> Self {
-        Type::Named {
-            name: "Option".to_string(),
-            args: vec![inner],
-        }
-    }
-    
-    pub fn result(ok: Type, err: Type) -> Self {
-        Type::Named {
-            name: "Result".to_string(),
-            args: vec![ok, err],
-        }
-    }
 } 
