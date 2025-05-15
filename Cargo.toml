@@ -6,15 +6,25 @@ edition = "2021"
 [workspace]
 members = [
     "vm",
-    "intoraw-derive"
+    "intoraw-derive",
+    "hades-ir"
 ]
 
 [lib]
 name = "vm"
 path = "vm/src/lib.rs"
 
+[[example]]
+name = "simple_ir"
+path = "examples/simple_ir.rs"
+
+[[example]]
+name = "ir_demonstration"
+path = "examples/ir_demonstration.rs"
+
 [dependencies]
 intoraw-derive = { path = "intoraw-derive", optional = true }
+hades-ir = { path = "hades-ir" }
 
 [features]
 default = ["derive"]
