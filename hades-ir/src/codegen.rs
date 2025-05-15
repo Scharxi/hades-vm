@@ -55,6 +55,11 @@ impl CodeGenContext {
         self.bytecode.extend_from_slice(bytes);
     }
 
+    /// Emit a 32-bit integer in little-endian format
+    fn emit_u32(&mut self, value: u32) {
+        self.emit_bytes(&value.to_le_bytes());
+    }
+
     /// Get the current position in the bytecode
     fn current_position(&self) -> usize {
         self.bytecode.len()
@@ -64,8 +69,8 @@ impl CodeGenContext {
     fn gen_constant(&mut self, value: &Value) -> Result<()> {
         let index = self.add_constant(value.clone());
         // Emit LOAD_CONST instruction with the constant pool index
-        self.emit(0x01); // LOAD_CONST opcode
-        self.emit_bytes(&(index as u32).to_le_bytes());
+        self.emit(0x04); // LoadConstant opcode
+        self.emit_u32(index as u32);
         Ok(())
     }
 
@@ -78,10 +83,10 @@ impl CodeGenContext {
 
         // Emit the appropriate opcode for the operation
         let opcode = match op {
-            Operation::Add => 0x10, // ADD opcode
-            Operation::Sub => 0x11, // SUB opcode
-            Operation::Mul => 0x12, // MUL opcode
-            Operation::Div => 0x13, // DIV opcode
+            Operation::Add => 0x01, // Add opcode
+            Operation::Sub => 0x03, // Sub opcode
+            Operation::Mul => 0x05, // Multiply opcode
+            Operation::Div => 0x0A, // Divide opcode
             _ => return Err(Error::CodeGenError(format!(
                 "Unsupported binary operation: {:?}",
                 op
@@ -102,8 +107,8 @@ impl CodeGenContext {
             
             Value::Argument { id, .. } => {
                 // Load argument from the appropriate slot
-                self.emit(0x02); // LOAD_ARG opcode
-                self.emit_bytes(&id.to_le_bytes());
+                self.emit(0x0F); // LoadLocal opcode
+                self.emit_u32(id.raw() as u32);
                 Ok(())
             },
             
@@ -129,7 +134,7 @@ impl CodeGenContext {
             Operation::Load => {
                 let ptr = &instruction.operands()[0];
                 self.gen_value(ptr)?;
-                self.emit(0x20); // LOAD opcode
+                self.emit(0x07); // LoadMemory opcode
                 Ok(())
             },
             
@@ -138,7 +143,7 @@ impl CodeGenContext {
                 let ptr = &instruction.operands()[1];
                 self.gen_value(value)?;
                 self.gen_value(ptr)?;
-                self.emit(0x21); // STORE opcode
+                self.emit(0x08); // StoreMemory opcode
                 Ok(())
             },
             
@@ -146,7 +151,7 @@ impl CodeGenContext {
                 if let Some(value) = instruction.operands().first() {
                     self.gen_value(value)?;
                 }
-                self.emit(0xFF); // RET opcode
+                self.emit(0x0E); // Return opcode
                 Ok(())
             },
             
@@ -173,8 +178,8 @@ impl CodeGenContext {
     /// Generate code for a function
     pub fn gen_function(&mut self, function: &Function) -> Result<()> {
         // Generate prologue
-        self.emit(0x00); // ENTER opcode
-        self.emit_bytes(&(function.parameters().len() as u32).to_le_bytes());
+        self.emit(0x0D); // Call opcode (used for function entry)
+        self.emit_u32(function.parameters().len() as u32);
 
         // Generate code for each basic block
         for block in function.basic_blocks() {
@@ -208,6 +213,6 @@ impl CodeGenerator {
     pub fn generate(&self, function: &Function) -> Result<(Vec<u8>, Vec<Value>)> {
         let mut context = CodeGenContext::new();
         context.gen_function(function)?;
-        Ok((context.bytecode.clone(), context.constant_pool.clone()))
+        Ok((context.bytecode, context.constant_pool))
     }
 } 

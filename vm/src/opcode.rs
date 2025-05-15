@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Opcode {
-    Add = 0x1,
+    Add = 0x01,
     Store = 0x2,
     Sub = 0x3,
-    LoadConstant = 0x4,
+    LoadConstant = 0x04,
     Multiply = 0x5,
     Print = 0x6,
     LoadMemory = 0x7,
@@ -13,9 +13,9 @@ pub enum Opcode {
     Divide = 0xA,
     LoadFromRegion = 0xB,
     StoreToRegion = 0xC,
-    Call = 0xD,
-    Return = 0xE,
-    LoadLocal = 0xF,
+    Call = 0x0D,
+    Return = 0x0E,
+    LoadLocal = 0x0F,
     StoreLocal = 0x10,
     Modulo = 0x11,
     Power = 0x12,
@@ -48,6 +48,7 @@ pub enum Opcode {
     MemSet = 0x54,    // Initialisieren eines Speicherbereichs mit einem Wert
     Yield = 0xF0,
     TerminateProcess = 0xFF,
+    CreateFrame = 0x40,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +104,7 @@ impl Opcode {
             Opcode::MemSet => 0, // Erwartet drei Werte auf dem Stack: Adresse, Anzahl und Wert
             Opcode::Yield => 0,
             Opcode::TerminateProcess => 0,
+            Opcode::CreateFrame => 1,
         }
     }
 }
@@ -165,6 +167,7 @@ impl TryFrom<u8> for Opcode {
             0x54 => Ok(Opcode::MemSet),
             0xF0 => Ok(Opcode::Yield),
             0xFF => Ok(Opcode::TerminateProcess),
+            0x40 => Ok(Opcode::CreateFrame),
             _ => Err(InvalidOpcodeError(value)),
         }
     }
@@ -235,6 +238,7 @@ impl OpcodeMapping for Opcode {
             "StringSubstring" => Some(Opcode::StringSubstring as u8),
             "StringCompare" => Some(Opcode::StringCompare as u8),
             "StringContains" => Some(Opcode::StringContains as u8),
+            "CreateFrame" => Some(Opcode::CreateFrame as u8),
             _ => None,
         }
     }

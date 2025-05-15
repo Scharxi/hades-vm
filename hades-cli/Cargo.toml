@@ -1,0 +1,12 @@
+[package]
+name = "hades-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hades-ir = { path = "../hades-ir" }
+vm = { path = "../vm" }
+nyx-compiler = { path = "../nyx-compiler" }
+clap = { version = "4.5.1", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "1.0"

@@ -439,7 +439,7 @@ impl InstructionExecutor {
                 let address = instruction.operands[0] as usize;
                 let local_count = instruction.operands[1] as usize;
 
-                // Sicherstellen, dass genügend Elemente auf dem Stack liegen
+                // Ensure we have enough values on the stack for parameters
                 if stack.values.len() < local_count {
                     panic!(
                         "Stack underflow in Call: Not enough values on stack for {} parameters",
@@ -447,66 +447,59 @@ impl InstructionExecutor {
                     );
                 }
 
-                // Parameter sind bereits auf dem Stack
-                let base_pointer = if local_count > 0 {
-                    stack.values.len() - local_count
-                } else {
-                    stack.values.len()
-                };
+                // Base pointer should point to the first parameter
+                let base_pointer = stack.values.len() - local_count;
 
-                // Das Return-Address-Handling sollte in der CPU passieren
-                // Hier verwenden wir einen temporären Wert
+                // Return address is the next instruction
                 let return_address = current_pc_of_instruction + 4;
 
-                // Frame erstellen
+                // Create frame
                 let frame = StackFrame {
                     return_address,
                     base_pointer,
                     local_count,
                 };
 
-                // Debug-Ausgabe
-                println!(
-                    "Call: addr={}, locals={}, base={}, stack={:?}",
-                    address, local_count, base_pointer, stack.values
-                );
+                // Debug output
+                if stack.current_frame.is_none() {
+                    println!(
+                        "Call: addr={}, locals={}, base={}, stack={:?}",
+                        address, local_count, base_pointer, stack.values
+                    );
+                }
 
-                // Frame hinzufügen
+                // Add frame
                 stack.frames.push(frame);
                 stack.current_frame = Some(stack.frames.len() - 1);
 
-                // Springe zur Funktionsadresse
+                // Jump to function address
                 ExecutionSignal::Jump(address)
             }
             Opcode::Return => {
-                // Muss mindestens einen Frame haben
+                // Must have at least one frame
                 if stack.frames.is_empty() {
                     panic!("Return without call frame");
                 }
 
-                // Aktuellen Frame holen
+                // Get current frame
                 let frame_idx = stack.current_frame.unwrap();
                 let current_frame = stack.frames[frame_idx].clone();
                 let return_address = current_frame.return_address;
-                let base_pointer = current_frame.base_pointer;
 
-                // Ist ein Rückgabewert auf dem Stack?
-                let return_value = if stack.values.len() > base_pointer {
+                // Get the return value if one exists
+                let return_value = if !stack.values.is_empty() {
                     Some(stack.values.last().unwrap().clone())
                 } else {
                     None
                 };
 
-                // Debug-Ausgabe
+                // Debug output
                 println!(
                     "Return: addr={}, base={}, stack={:?}, return_value={:?}",
-                    return_address, base_pointer, stack.values, return_value
+                    return_address, current_frame.base_pointer, stack.values, return_value
                 );
 
-                // Lokale Variablen und Parameter entfernen
-                stack.values.clear();
-
-                // Frame entfernen
+                // Remove frame
                 stack.frames.pop();
                 stack.current_frame = if stack.frames.is_empty() {
                     None
@@ -514,27 +507,30 @@ impl InstructionExecutor {
                     Some(stack.frames.len() - 1)
                 };
 
-                // Rückgabewert (falls vorhanden) wieder auf den Stack legen
+                // Clear the stack up to the base pointer of the current frame
+                // Keep only the return value if it exists
+                stack.values.truncate(current_frame.base_pointer);
                 if let Some(value) = return_value {
                     stack.values.push(value);
                 }
 
-                // Zur Rücksprungadresse zurückkehren
-                ExecutionSignal::Jump(return_address)
+                // If this was the last frame and we had a return value,
+                // this is the final result of the program
+                if stack.frames.is_empty() && !stack.values.is_empty() {
+                    ExecutionSignal::Terminate
+                } else {
+                    // Return to caller
+                    ExecutionSignal::Jump(return_address)
+                }
             }
             Opcode::LoadLocal => {
                 let local_index = instruction.operands[0] as usize;
 
-                // Lokale Variablen vom aktuellen Frame laden
+                // Get the current frame
                 if let Some(frame_idx) = stack.current_frame {
-                    // Sicherstellen, dass der Frame-Index gültig ist
-                    if frame_idx >= stack.frames.len() {
-                        panic!("LoadLocal: Invalid frame index: {}", frame_idx);
-                    }
-
                     let frame = &stack.frames[frame_idx];
 
-                    // Sicherstellen, dass der lokale Index gültig ist
+                    // Ensure the local index is valid
                     if local_index >= frame.local_count {
                         panic!(
                             "LoadLocal: Local index {} out of bounds (local_count={})",
@@ -542,16 +538,17 @@ impl InstructionExecutor {
                         );
                     }
 
-                    // Debug-Ausgabe
-                    println!(
-                        "LoadLocal: frame={}, idx={}, base={}, stack={:?}",
-                        frame_idx, local_index, frame.base_pointer, stack.values
-                    );
-
-                    // Berechne den tatsächlichen Index im Stack
+                    // Calculate the actual stack index
+                    // Parameters are stored starting at base_pointer
                     let stack_index = frame.base_pointer + local_index;
 
-                    // Überprüfe, ob der berechnete Index im Stack-Bereich liegt
+                    // Debug output
+                    println!(
+                        "LoadLocal: frame={}, idx={}, base={}, stack_idx={}, stack={:?}",
+                        frame_idx, local_index, frame.base_pointer, stack_index, stack.values
+                    );
+
+                    // Ensure the stack index is valid
                     if stack_index >= stack.values.len() {
                         panic!(
                             "LoadLocal: Stack index {} out of bounds (stack_len={})",
@@ -560,7 +557,7 @@ impl InstructionExecutor {
                         );
                     }
 
-                    // Lade den Wert und füge ihn zum Stack hinzu
+                    // Load the value and push it onto the stack
                     let value = stack.values[stack_index].clone();
                     stack.push(value);
 
@@ -1229,6 +1226,37 @@ impl InstructionExecutor {
                     panic!("TerminateProcess instruction requires 0 operands");
                 }
                 ExecutionSignal::Terminate
+            }
+            Opcode::CreateFrame => {
+                let param_count = instruction.operands[0] as usize;
+
+                // Base pointer should point to where the parameters start
+                // Parameters are already on the stack in the correct order
+                let base_pointer = if stack.values.len() >= param_count {
+                    stack.values.len() - param_count
+                } else {
+                    panic!("CreateFrame: Not enough values on stack for parameters");
+                };
+
+                // Create frame with return_address set to 0 initially
+                // This will be updated by the Call instruction
+                let frame = StackFrame {
+                    return_address: 0,
+                    base_pointer,
+                    local_count: param_count,
+                };
+
+                // Debug output
+                println!(
+                    "CreateFrame: params={}, base={}, stack={:?}",
+                    param_count, base_pointer, stack.values
+                );
+
+                // Add frame
+                stack.frames.push(frame);
+                stack.current_frame = Some(stack.frames.len() - 1);
+
+                ExecutionSignal::Continue
             }
             // The unreachable catch-all pattern is removed as all opcodes are already handled
         }

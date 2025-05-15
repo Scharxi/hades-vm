@@ -133,20 +133,29 @@ impl CPU {
 
     /// Loads a program into memory, creates the initial process, and sets it as running.
     pub fn load_program(&mut self, program: &[u8]) {
+        // Save the existing stack state
+        let saved_stack = self.stack.clone();
+
+        // Clear any existing processes
+        self.processes.clear();
+        self.current_process_idx = None;
+
+        // Load the program into memory
         self.load_program_to_memory(program);
         
-        // Ersten Prozess erstellen
+        // Create the initial process
         let initial_pc = 0; 
         let main_process_pid = self.create_process(initial_pc, 256);
 
-        // Den ersten Prozess als laufend setzen
+        // Set the first process as running and restore the stack
         if let Some(first_process_pcb) = self.processes.iter_mut().find(|p| p.pid == main_process_pid) {
             first_process_pcb.state = ProcessState::Running;
+            first_process_pcb.stack = saved_stack.clone();
             self.fetcher.set_pc(first_process_pcb.pc);
-            self.stack = first_process_pcb.stack.clone();
+            self.stack = saved_stack;
             self.current_process_idx = self.processes.iter().position(|p| p.pid == main_process_pid);
         } else {
-            panic!("Konnte den initialen Prozess nicht als laufend setzen.");
+            panic!("Could not set initial process as running.");
         }
     }
     
@@ -182,17 +191,16 @@ impl CPU {
     pub fn step(&mut self) -> bool {
         let current_idx = match self.current_process_idx {
             Some(idx) => idx,
-            None => return false, // Kein laufender Prozess, VM stoppt
+            None => return false, // No running process, VM stops
         };
 
-        // Sicherstellen, dass der Index gültig ist und der Prozess läuft oder bereit ist
+        // Ensure the index is valid and the process is running or ready
         if current_idx >= self.processes.len() || self.processes[current_idx].state == ProcessState::Terminated {
-            // Versuchen, einen neuen Prozess zu schedulen, wenn der aktuelle ungültig/terminiert ist
-            return self.schedule_and_switch_context(None); 
+            // Try to schedule a new process if the current one is invalid/terminated
+            return false; 
         }
         
-        // PC und Stack für den aktuellen Prozess aus PCB in die CPU-Komponenten laden
-        // (Stack wird beim Kontextwechsel geladen, PC hier für den fetcher)
+        // Load PC and stack for the current process from PCB into CPU components
         self.fetcher.set_pc(self.processes[current_idx].pc);
 
         if let Some(instruction_raw) = self.fetcher.fetch(&mut self.memory) {
@@ -207,12 +215,13 @@ impl CPU {
                         pc_of_current_instruction,
                     );
 
+                    // Update PC in PCB
                     self.processes[current_idx].pc = self.fetcher.pc;
 
                     match execution_signal {
                         ExecutionSignal::Continue => {}
                         ExecutionSignal::Jump(address) => {
-                            if instruction.opcode == Opcode::Call { // Check opcode on successful decode
+                            if instruction.opcode == Opcode::Call {
                                 if let Some(frame_idx) = self.stack.current_frame {
                                     if frame_idx < self.stack.frames.len() {
                                         self.stack.frames[frame_idx].return_address = self.processes[current_idx].pc;
@@ -225,35 +234,32 @@ impl CPU {
                         ExecutionSignal::Yield => {
                             self.processes[current_idx].state = ProcessState::Ready;
                             self.processes[current_idx].stack = self.stack.clone();
-                            return self.schedule_and_switch_context(Some(current_idx));
+                            return false;
                         }
                         ExecutionSignal::Terminate => {
                             self.processes[current_idx].state = ProcessState::Terminated;
-                            self.processes[current_idx].stack = self.stack.clone(); 
-                            return self.schedule_and_switch_context(Some(current_idx)); 
+                            self.processes[current_idx].stack = self.stack.clone();
+                            return false; // Stop execution when the process terminates
                         }
                     }
                     true // An instruction was executed or signal handled
                 }
                 Err(decode_error) => {
-                    // Handle decode error, e.g., print error and terminate process
-                    // Use a more specific error log if DecodeError contains more info
+                    // Handle decode error, terminate process
                     eprintln!(
                         "PID {}: Failed to decode instruction at PC {}. Error: {:?}. Terminating process.",
                         self.processes[current_idx].pid,
-                        self.processes[current_idx].pc, // PC before fetch attempt
+                        self.processes[current_idx].pc,
                         decode_error
                     );
                     self.processes[current_idx].state = ProcessState::Terminated;
-                    self.processes[current_idx].stack = self.stack.clone(); // Save stack state
-                    self.schedule_and_switch_context(Some(current_idx)) // Attempt to switch context
+                    false
                 }
             }
         } else {
-            // No instruction fetched (e.g., end of program memory for this process's PC)
+            // No more instructions to fetch, terminate process
             self.processes[current_idx].state = ProcessState::Terminated;
-            self.processes[current_idx].stack = self.stack.clone(); 
-            self.schedule_and_switch_context(Some(current_idx))
+            false
         }
     }
 

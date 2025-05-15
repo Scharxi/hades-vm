@@ -203,7 +203,7 @@ impl Stack {
         self.values.pop()
     }
     
-    /// Gets the top value without removing it.
+    /// Returns a reference to the top value on the stack without removing it.
     pub fn peek(&self) -> Option<&StackValue> {
         self.values.last()
     }
@@ -282,16 +282,10 @@ impl Stack {
         if let Some(frame_idx) = self.current_frame {
             let frame = &self.frames[frame_idx];
             
-            // The base_pointer is set to the stack length when the frame is created,
-            // so we need to access elements BEFORE the base_pointer
+            // Calculate the correct index for local variables
+            // Parameters are stored at base_pointer and onwards
             if index < frame.local_count {
-                // Access local variables BEFORE the base_pointer
-                let local_idx = if frame.base_pointer >= index + 1 {
-                    frame.base_pointer - index - 1
-                } else {
-                    return None; // Invalid index
-                };
-                
+                let local_idx = frame.base_pointer + index;
                 if local_idx < self.values.len() {
                     return Some(&self.values[local_idx]);
                 }
@@ -307,43 +301,37 @@ impl Stack {
         if let Some(frame_idx) = self.current_frame {
             let frame = &self.frames[frame_idx];
             
-            // The base_pointer is set to the stack length when the frame is created,
-            // so we need to access elements BEFORE the base_pointer
+            // Calculate the correct index for local variables
+            // Parameters are stored at base_pointer and onwards
             if index < frame.local_count {
-                // Access local variables BEFORE the base_pointer
-                let local_idx = if frame.base_pointer >= index + 1 {
-                    frame.base_pointer - index - 1
-                } else {
-                    return Err("Local variable index out of bounds"); // Invalid index
-                };
-                
+                let local_idx = frame.base_pointer + index;
                 if local_idx < self.values.len() {
                     self.values[local_idx] = value;
                     return Ok(());
                 }
             }
-            Err("Local variable index out of bounds")
+            Err("Invalid local variable index")
         } else {
             Err("No active stack frame")
         }
     }
     
-    /// Gets the number of values on the stack.
+    /// Returns the number of values on the stack.
     pub fn len(&self) -> usize {
         self.values.len()
     }
     
-    /// Checks if the stack is empty.
+    /// Returns true if the stack is empty.
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
     
-    /// Gets the current frame depth.
+    /// Returns the current frame depth.
     pub fn frame_depth(&self) -> usize {
         self.frames.len()
     }
     
-    /// Clears the stack.
+    /// Clears all values and frames from the stack.
     pub fn clear(&mut self) {
         self.values.clear();
         self.frames.clear();

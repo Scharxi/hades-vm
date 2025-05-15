@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 intoraw-derive = { path = "../intoraw-derive", optional = true }
+thiserror = "2.0.12"
 
 [features]
 default = ["derive"]

@@ -10,7 +10,7 @@ members = [
     "hades-ir",
     "hades-ir-interpreter",
     "nyx-compiler"
-]
+, "hades-cli"]
 
 [lib]
 name = "vm"
@@ -27,6 +27,7 @@ path = "examples/ir_demonstration.rs"
 [dependencies]
 intoraw-derive = { path = "intoraw-derive", optional = true }
 hades-ir = { path = "hades-ir" }
+thiserror = "2.0.12"
 
 [features]
 default = ["derive"]

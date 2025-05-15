@@ -1104,81 +1104,59 @@ impl SegmentedMemory {
 }
 
 impl SegmentedMemory {
-    /// Creates a standard memory layout for a general-purpose VM.
-    ///
-    /// This layout divides memory into the following regions:
-    /// - Code (20%): For program instructions (Read + Execute)
-    /// - Constants (10%): For read-only data (Read only)
-    /// - Data (20%): For global variables (Read + Write)
-    /// - Stack (25%): For call stack and local variables (Read + Write)
-    /// - Heap (remainder): For dynamic allocations (Read + Write)
-    ///
-    /// # Arguments
-    ///
-    /// * `memory_size` - The total size of memory to allocate
-    ///
-    /// # Returns
-    ///
-    /// `Ok(memory)` with the configured memory layout, or `Err` with a 
-    /// description if the memory size is too small
+    /// Creates a standard memory layout for development with writable CODE region
     pub fn create_standard_layout(memory_size: usize) -> Result<Self, String> {
-        if memory_size < 1024 {
-            return Err("Memory size too small for standard layout".to_string());
-        }
-        
         let mut memory = Self::new(memory_size);
-        
-        // Code-Region (20% des Speichers)
-        let code_size = memory_size / 5;
-        memory.define_region(MemoryRegion::new(
+
+        // Calculate region sizes (simplified for development)
+        let code_size = memory_size / 4;
+        let data_size = memory_size / 4;
+        let stack_size = memory_size / 4;
+        let heap_size = memory_size / 4;
+
+        // Define regions with appropriate permissions
+        let code_region = MemoryRegion::new(
             MemoryRegionType::Code,
             0,
             code_size,
-            vec![AccessPermission::Read, AccessPermission::Execute],
-            Some("Program Code".to_string()),
-        ))?;
-        
-        // Konstanten-Region (10% des Speichers)
-        let const_size = memory_size / 10;
-        memory.define_region(MemoryRegion::new(
-            MemoryRegionType::Constants,
-            code_size,
-            const_size,
-            vec![AccessPermission::Read],
-            Some("Constants".to_string()),
-        ))?;
-        
-        // Daten-Region (20% des Speichers)
-        let data_size = memory_size / 5;
-        memory.define_region(MemoryRegion::new(
+            vec![
+                AccessPermission::Read,
+                AccessPermission::Write,  // Make CODE writable during development
+                AccessPermission::Execute,
+            ],
+            Some("Code Region".to_string()),
+        );
+
+        let data_region = MemoryRegion::new(
             MemoryRegionType::Data,
-            code_size + const_size,
+            code_size,
             data_size,
             vec![AccessPermission::Read, AccessPermission::Write],
-            Some("Global Data".to_string()),
-        ))?;
-        
-        // Stack-Region (25% des Speichers)
-        let stack_size = memory_size / 4;
-        memory.define_region(MemoryRegion::new(
+            Some("Data Region".to_string()),
+        );
+
+        let stack_region = MemoryRegion::new(
             MemoryRegionType::Stack,
-            code_size + const_size + data_size,
+            code_size + data_size,
             stack_size,
             vec![AccessPermission::Read, AccessPermission::Write],
-            Some("Call Stack".to_string()),
-        ))?;
-        
-        // Heap-Region (Rest des Speichers)
-        let heap_start = code_size + const_size + data_size + stack_size;
-        let heap_size = memory_size - heap_start;
-        memory.define_region(MemoryRegion::new(
+            Some("Stack Region".to_string()),
+        );
+
+        let heap_region = MemoryRegion::new(
             MemoryRegionType::Heap,
-            heap_start,
+            code_size + data_size + stack_size,
             heap_size,
             vec![AccessPermission::Read, AccessPermission::Write],
-            Some("Dynamic Memory".to_string()),
-        ))?;
-        
+            Some("Heap Region".to_string()),
+        );
+
+        // Add regions to memory
+        memory.define_region(code_region)?;
+        memory.define_region(data_region)?;
+        memory.define_region(stack_region)?;
+        memory.define_region(heap_region)?;
+
         Ok(memory)
     }
     
