@@ -39,6 +39,7 @@ pub mod context;
 // pub mod target;
 // pub mod verifier;
 pub mod bytecode;
+mod type_checker;
 
 // Re-export core components
 pub use context::Context;
@@ -51,6 +52,7 @@ pub use value::Value;
 pub use builder::Builder;
 pub use error::{Error, Result};
 pub use bytecode::BytecodeGenerator;
+pub use type_checker::TypeChecker;
 // pub use target::Target;
 
 /// Version of the IR specification
