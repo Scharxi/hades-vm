@@ -1,33 +1,37 @@
 use thiserror::Error;
 
 /// Errors that can occur during IR operations
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    /// An error in type checking
+    /// Type checking error
     #[error("Type error: {0}")]
     TypeError(String),
     
-    /// An error in IR validation
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-    
-    /// An error in IR construction
+    /// Error during IR construction
     #[error("Construction error: {0}")]
     ConstructionError(String),
     
-    /// An error in IR optimization
+    /// Validation error
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+    
+    /// Optimization error
     #[error("Optimization error: {0}")]
     OptimizationError(String),
     
-    /// An error in bytecode generation
+    /// Bytecode generation error
     #[error("Bytecode generation error: {0}")]
     BytecodeGenerationError(String),
     
-    /// An error in the VM
+    /// Code generation error
+    #[error("Code generation error: {0}")]
+    CodeGenError(String),
+    
+    /// VM error
     #[error("VM error: {0}")]
     VMError(String),
     
-    /// Other errors
+    /// Other error
     #[error("Other error: {0}")]
     Other(String),
 }

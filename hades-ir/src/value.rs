@@ -1,6 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::hash::{Hash, Hasher};
 
 use crate::types::Type;
 
@@ -9,18 +10,24 @@ static VALUE_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// A unique identifier for values in the IR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ValueId(usize);
+pub struct ValueId(u64);
 
 impl ValueId {
     /// Create a new unique value ID
     pub fn new() -> Self {
-        let id = VALUE_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-        Self(id)
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        Self(NEXT_ID.fetch_add(1, Ordering::Relaxed))
     }
     
     /// Get the raw ID value
     pub fn raw(&self) -> usize {
-        self.0
+        self.0 as usize
+    }
+
+    /// Convert to bytes in little-endian format
+    pub fn to_le_bytes(&self) -> [u8; 8] {
+        self.0.to_le_bytes()
     }
 }
 
@@ -319,6 +326,82 @@ impl fmt::Display for Value {
             }
             Value::Undefined { id, .. } => write!(f, "{}", id),
             Value::StringConstant { value } => write!(f, "\"{}\"", value.escape_debug()),
+        }
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::IntegerConstant { value: v1, .. }, Value::IntegerConstant { value: v2, .. }) => v1 == v2,
+            (Value::FloatConstant { value: v1, .. }, Value::FloatConstant { value: v2, .. }) => v1 == v2,
+            (Value::BooleanConstant { value: v1 }, Value::BooleanConstant { value: v2 }) => v1 == v2,
+            (Value::CharConstant { value: v1 }, Value::CharConstant { value: v2 }) => v1 == v2,
+            (Value::StringConstant { value: v1 }, Value::StringConstant { value: v2 }) => v1 == v2,
+            (Value::NullPointer { .. }, Value::NullPointer { .. }) => true,
+            (Value::GlobalVariable { id: id1, .. }, Value::GlobalVariable { id: id2, .. }) => id1 == id2,
+            (Value::Argument { id: id1, .. }, Value::Argument { id: id2, .. }) => id1 == id2,
+            (Value::Function { id: id1, .. }, Value::Function { id: id2, .. }) => id1 == id2,
+            (Value::Instruction { id: id1, .. }, Value::Instruction { id: id2, .. }) => id1 == id2,
+            (Value::BasicBlock { id: id1, .. }, Value::BasicBlock { id: id2, .. }) => id1 == id2,
+            (Value::Undefined { id: id1, .. }, Value::Undefined { id: id2, .. }) => id1 == id2,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Value {}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Value::IntegerConstant { value, .. } => {
+                0u8.hash(state);
+                value.hash(state);
+            },
+            Value::FloatConstant { value, .. } => {
+                1u8.hash(state);
+                value.to_bits().hash(state);
+            },
+            Value::BooleanConstant { value } => {
+                2u8.hash(state);
+                value.hash(state);
+            },
+            Value::CharConstant { value } => {
+                3u8.hash(state);
+                value.hash(state);
+            },
+            Value::StringConstant { value } => {
+                4u8.hash(state);
+                value.hash(state);
+            },
+            Value::NullPointer { .. } => {
+                5u8.hash(state);
+            },
+            Value::GlobalVariable { id, .. } => {
+                6u8.hash(state);
+                id.hash(state);
+            },
+            Value::Argument { id, .. } => {
+                7u8.hash(state);
+                id.hash(state);
+            },
+            Value::Function { id, .. } => {
+                8u8.hash(state);
+                id.hash(state);
+            },
+            Value::Instruction { id, .. } => {
+                9u8.hash(state);
+                id.hash(state);
+            },
+            Value::BasicBlock { id, .. } => {
+                10u8.hash(state);
+                id.hash(state);
+            },
+            Value::Undefined { id, .. } => {
+                11u8.hash(state);
+                id.hash(state);
+            },
         }
     }
 } 

@@ -40,6 +40,7 @@ pub mod context;
 // pub mod verifier;
 pub mod bytecode;
 mod type_checker;
+mod codegen;
 
 // Re-export core components
 pub use context::Context;
@@ -48,11 +49,12 @@ pub use function::{Function, Linkage};
 pub use basic_block::BasicBlock;
 pub use instruction::{Instruction, Operation};
 pub use types::Type;
-pub use value::Value;
+pub use value::{Value, ValueId};
 pub use builder::Builder;
 pub use error::{Error, Result};
 pub use bytecode::BytecodeGenerator;
 pub use type_checker::TypeChecker;
+pub use codegen::CodeGenerator;
 // pub use target::Target;
 
 /// Version of the IR specification
