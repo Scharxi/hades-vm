@@ -1,11 +1,13 @@
 use std::sync::Arc;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use crate::error::Result;
 
 /// The Context is the main container for an IR compilation session.
 /// It manages global data like type definitions and interned strings,
 /// and serves as a factory for creating IR elements.
+#[derive(Debug, Clone)]
 pub struct Context {
     /// Internal state of the context
     state: Arc<RefCell<ContextState>>,
@@ -14,6 +16,7 @@ pub struct Context {
 /// Internal state of the Context, held behind Rc<RefCell<>> to allow
 /// sharing and mutation from different places while preventing
 /// multiple simultaneous borrows.
+#[derive(Debug)]
 struct ContextState {
     /// String interning table - reduces memory usage by storing each unique string once
     string_table: HashMap<String, usize>,
@@ -26,6 +29,7 @@ struct ContextState {
 }
 
 /// A type in the type table
+#[derive(Debug)]
 struct TypeEntry {
     /// Unique ID
     id: usize,

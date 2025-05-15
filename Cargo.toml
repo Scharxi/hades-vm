@@ -18,6 +18,10 @@ path = "vm/src/lib.rs"
 name = "simple_ir"
 path = "examples/simple_ir.rs"
 
+[[example]]
+name = "ir_demonstration"
+path = "examples/ir_demonstration.rs"
+
 [dependencies]
 intoraw-derive = { path = "intoraw-derive", optional = true }
 hades-ir = { path = "hades-ir" }

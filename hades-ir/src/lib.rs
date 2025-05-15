@@ -24,14 +24,14 @@
 //! through various analysis and optimization `Pass`es before finally being compiled to
 //! Hades VM bytecode.
 
-// Module declarations - will be uncommented as they are implemented
-// pub mod module;
-// pub mod function;
-// pub mod basic_block;
-// pub mod instruction;
+// Core components
+pub mod module;
+pub mod function;
+pub mod basic_block;
+pub mod instruction;
 pub mod types;
 pub mod value;
-// pub mod builder;
+pub mod builder;
 // pub mod pass;
 pub mod error;
 pub mod context;
@@ -42,14 +42,14 @@ pub mod bytecode;
 
 // Re-export core components
 pub use context::Context;
-// pub use module::Module;
-// pub use function::Function;
-// pub use basic_block::BasicBlock;
-// pub use instruction::Instruction;
+pub use module::Module;
+pub use function::{Function, Linkage};
+pub use basic_block::BasicBlock;
+pub use instruction::{Instruction, Operation};
 pub use types::Type;
 pub use value::Value;
-// pub use builder::Builder;
-pub use error::Error;
+pub use builder::Builder;
+pub use error::{Error, Result};
 pub use bytecode::BytecodeGenerator;
 // pub use target::Target;
 
