@@ -36,6 +36,11 @@ pub enum Opcode {
     Dup = 0x21,
     Swap = 0x22,
     Drop = 0x23,
+    StringConcat = 0x30,
+    StringLength = 0x31,
+    StringSubstring = 0x32,
+    StringCompare = 0x33,
+    StringContains = 0x34,
     Alloc = 0x50,
     Free = 0x51,
     LoadHeap = 0x52,  // Laden von Werten aus dem Heap
@@ -86,6 +91,11 @@ impl Opcode {
             Opcode::Dup => 0,
             Opcode::Swap => 0,
             Opcode::Drop => 0,
+            Opcode::StringConcat => 0,
+            Opcode::StringLength => 0,
+            Opcode::StringSubstring => 2,
+            Opcode::StringCompare => 0,
+            Opcode::StringContains => 0,
             Opcode::Alloc => 1,
             Opcode::Free => 0, // Takes no operands, pops address from stack
             Opcode::LoadHeap => 0, // Erwartet zwei Werte auf dem Stack: Adresse und Offset
@@ -143,6 +153,11 @@ impl TryFrom<u8> for Opcode {
             0x21 => Ok(Opcode::Dup),
             0x22 => Ok(Opcode::Swap),
             0x23 => Ok(Opcode::Drop),
+            0x30 => Ok(Opcode::StringConcat),
+            0x31 => Ok(Opcode::StringLength),
+            0x32 => Ok(Opcode::StringSubstring),
+            0x33 => Ok(Opcode::StringCompare),
+            0x34 => Ok(Opcode::StringContains),
             0x50 => Ok(Opcode::Alloc),
             0x51 => Ok(Opcode::Free),
             0x52 => Ok(Opcode::LoadHeap),
@@ -215,6 +230,11 @@ impl OpcodeMapping for Opcode {
             "MemSet" => Some(Opcode::MemSet as u8),
             "Yield" => Some(Opcode::Yield as u8),
             "TerminateProcess" => Some(Opcode::TerminateProcess as u8),
+            "StringConcat" => Some(Opcode::StringConcat as u8),
+            "StringLength" => Some(Opcode::StringLength as u8),
+            "StringSubstring" => Some(Opcode::StringSubstring as u8),
+            "StringCompare" => Some(Opcode::StringCompare as u8),
+            "StringContains" => Some(Opcode::StringContains as u8),
             _ => None,
         }
     }

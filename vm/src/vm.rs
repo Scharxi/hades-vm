@@ -50,7 +50,7 @@ impl VirtualMachine {
     
     /// Gets the top value on the stack.
     pub fn stack_top(&self) -> Option<StackValue> {
-        self.cpu.stack.peek().copied()
+        self.cpu.stack.peek().map(|value| value.clone())
     }
     
     /// Prints a debug view of the memory map.

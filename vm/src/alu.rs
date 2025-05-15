@@ -142,6 +142,47 @@ impl ALU {
     pub fn less_than(&self, a: i32, b: i32) -> bool {
         a < b
     }
+
+    /// Concatenates two strings.
+    pub fn string_concat(&self, a: String, b: String) -> String {
+        a + &b
+    }
+
+    /// Returns the length of a string.
+    pub fn string_length(&self, s: &str) -> i32 {
+        s.len() as i32
+    }
+
+    /// Returns a substring.
+    pub fn string_substring(&self, s: &str, start: i32, length: i32) -> String {
+        if start < 0 || length < 0 {
+            panic!("Invalid substring parameters");
+        }
+        let start = start as usize;
+        let length = length as usize;
+        if start + length > s.len() {
+            panic!("Substring out of bounds");
+        }
+        s[start..start + length].to_string()
+    }
+
+    /// Compares two strings.
+    /// Returns:
+    /// - 0 if equal
+    /// - negative if a < b
+    /// - positive if a > b
+    pub fn string_compare(&self, a: &str, b: &str) -> i32 {
+        match a.cmp(b) {
+            std::cmp::Ordering::Less => -1,
+            std::cmp::Ordering::Equal => 0,
+            std::cmp::Ordering::Greater => 1,
+        }
+    }
+
+    /// Checks if string a contains string b.
+    pub fn string_contains(&self, a: &str, b: &str) -> bool {
+        a.contains(b)
+    }
 }
 
 #[cfg(test)]
@@ -286,5 +327,54 @@ mod tests {
     fn test_invalid_shift_right() {
         let alu = ALU;
         alu.shift_right(1, -1);
+    }
+
+    #[test]
+    fn test_string_operations() {
+        let alu = ALU;
+        
+        // Test string concatenation
+        assert_eq!(
+            alu.string_concat("Hello ".to_string(), "World".to_string()),
+            "Hello World".to_string()
+        );
+        
+        // Test string length
+        assert_eq!(alu.string_length("Hello"), 5);
+        assert_eq!(alu.string_length(""), 0);
+        
+        // Test substring
+        assert_eq!(alu.string_substring("Hello", 1, 3), "ell");
+        assert_eq!(alu.string_substring("Hello", 0, 5), "Hello");
+        
+        // Test string comparison
+        assert_eq!(alu.string_compare("abc", "abc"), 0);
+        assert!(alu.string_compare("abc", "def") < 0);
+        assert!(alu.string_compare("def", "abc") > 0);
+        
+        // Test string contains
+        assert!(alu.string_contains("Hello World", "World"));
+        assert!(!alu.string_contains("Hello World", "Goodbye"));
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid substring parameters")]
+    fn test_invalid_substring_negative_start() {
+        let alu = ALU;
+        alu.string_substring("Hello", -1, 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid substring parameters")]
+    fn test_invalid_substring_negative_length() {
+        let alu = ALU;
+        alu.string_substring("Hello", 0, -1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Substring out of bounds")]
+    fn test_invalid_substring_out_of_bounds() {
+        let alu = ALU;
+        alu.string_substring("Hello", 2, 4);
     }
 } 

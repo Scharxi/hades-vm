@@ -7,7 +7,7 @@
 ///
 /// This enum allows the VM to support multiple data types in the same stack,
 /// enabling type-safe operations and rich data representation.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StackValue {
     /// 32-bit signed integer
     Integer(i32),
@@ -17,6 +17,8 @@ pub enum StackValue {
     Boolean(bool),
     /// Memory reference/pointer (address)
     Reference(usize),
+    /// String value (heap-allocated)
+    String(String),
 }
 
 impl StackValue {
@@ -59,14 +61,23 @@ impl StackValue {
             _ => panic!("Expected Reference, got {:?}", self),
         }
     }
+
+    /// Convert to string, panicking if not a String
+    pub fn as_string(&self) -> String {
+        match self {
+            StackValue::String(s) => s.clone(),
+            _ => panic!("Expected String, got {:?}", self),
+        }
+    }
     
     /// Convenience method to check if value is zero (or equivalent)
     pub fn is_zero(&self) -> bool {
-        match *self {
-            StackValue::Integer(i) => i == 0,
-            StackValue::Float(f) => f == 0.0,
+        match self {
+            StackValue::Integer(i) => *i == 0,
+            StackValue::Float(f) => *f == 0.0,
             StackValue::Boolean(b) => !b,
-            StackValue::Reference(addr) => addr == 0,
+            StackValue::Reference(addr) => *addr == 0,
+            StackValue::String(s) => s.is_empty(),
         }
     }
 }

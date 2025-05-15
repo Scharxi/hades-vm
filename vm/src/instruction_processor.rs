@@ -296,6 +296,7 @@ impl InstructionExecutor {
                         StackValue::Float(f) => writeln!(self.output, "Float: {}", f),
                         StackValue::Boolean(b) => writeln!(self.output, "Boolean: {}", b),
                         StackValue::Reference(r) => writeln!(self.output, "Reference: 0x{:x}", r),
+                        StackValue::String(s) => writeln!(self.output, "String: {}", s),
                     }
                     .expect("Failed to write to stdout");
                 } else {
@@ -560,7 +561,7 @@ impl InstructionExecutor {
                     }
 
                     // Lade den Wert und füge ihn zum Stack hinzu
-                    let value = stack.values[stack_index];
+                    let value = stack.values[stack_index].clone();
                     stack.push(value);
 
                     ExecutionSignal::Continue
@@ -658,7 +659,7 @@ impl InstructionExecutor {
                 }
 
                 let value = stack.peek().expect("Stack underflow");
-                stack.push(*value);
+                stack.push(value.clone());
                 ExecutionSignal::Continue
             }
             Opcode::Swap => {
@@ -1111,8 +1112,108 @@ impl InstructionExecutor {
                 }
                 ExecutionSignal::Continue
             }
-            // --- Platzhalter für neue Opcodes ---
-            // Sie müssen diese Opcodes zu Ihrer Opcode-Enum hinzufügen (vermutlich in opcode.rs)
+            Opcode::StringConcat => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("StringConcat instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::String(a_val), StackValue::String(b_val)) => {
+                            let result = self.alu.string_concat(b_val, a_val);
+                            stack.push(StackValue::String(result));
+                        }
+                        _ => panic!("Type mismatch in StringConcat operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::StringLength => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("StringLength instruction requires 0 operands");
+                }
+
+                if let Some(value) = stack.pop() {
+                    match value {
+                        StackValue::String(s) => {
+                            let result = self.alu.string_length(&s);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in StringLength operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::StringSubstring => {
+                if instruction.opcode.operand_count() != 2 {
+                    panic!("StringSubstring instruction requires 2 operands");
+                }
+
+                let start = instruction.operands[0];
+                let length = instruction.operands[1];
+
+                if let Some(value) = stack.pop() {
+                    match value {
+                        StackValue::String(s) => {
+                            let result = self.alu.string_substring(&s, start, length);
+                            stack.push(StackValue::String(result));
+                        }
+                        _ => panic!("Type mismatch in StringSubstring operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::StringCompare => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("StringCompare instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::String(a_val), StackValue::String(b_val)) => {
+                            let result = self.alu.string_compare(&b_val, &a_val);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in StringCompare operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::StringContains => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("StringContains instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::String(a_val), StackValue::String(b_val)) => {
+                            let result = self.alu.string_contains(&b_val, &a_val);
+                            stack.push(StackValue::Boolean(result));
+                        }
+                        _ => panic!("Type mismatch in StringContains operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
             Opcode::Yield => {
                 // Signalisiert der VM-Hauptschleife, dass ein Kontextwechsel stattfinden soll.
                 // Keine Operanden erwartet.
@@ -1611,6 +1712,98 @@ mod tests {
         let instruction = Instruction {
             opcode: Opcode::Equal,
             operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+    }
+
+    #[test]
+    fn test_string_operations() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024);
+        let mut memory = SegmentedMemory::new(1024);
+
+        // Test StringConcat
+        stack.push(StackValue::String("Hello ".to_string()));
+        stack.push(StackValue::String("World".to_string()));
+        let instruction = Instruction {
+            opcode: Opcode::StringConcat,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(
+            stack.pop(),
+            Some(StackValue::String("Hello World".to_string()))
+        );
+
+        // Test StringLength
+        stack.push(StackValue::String("Hello".to_string()));
+        let instruction = Instruction {
+            opcode: Opcode::StringLength,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Integer(5)));
+
+        // Test StringSubstring
+        stack.push(StackValue::String("Hello World".to_string()));
+        let instruction = Instruction {
+            opcode: Opcode::StringSubstring,
+            operands: vec![6, 5], // Start at index 6, take 5 characters
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(
+            stack.pop(),
+            Some(StackValue::String("World".to_string()))
+        );
+
+        // Test StringCompare
+        stack.push(StackValue::String("abc".to_string()));
+        stack.push(StackValue::String("def".to_string()));
+        let instruction = Instruction {
+            opcode: Opcode::StringCompare,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert!(matches!(stack.pop(), Some(StackValue::Integer(i)) if i < 0));
+
+        // Test StringContains
+        stack.push(StackValue::String("Hello World".to_string()));
+        stack.push(StackValue::String("World".to_string()));
+        let instruction = Instruction {
+            opcode: Opcode::StringContains,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Boolean(true)));
+    }
+
+    #[test]
+    #[should_panic(expected = "Type mismatch in StringConcat operation")]
+    fn test_string_concat_type_mismatch() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024);
+        let mut memory = SegmentedMemory::new(1024);
+
+        stack.push(StackValue::String("Hello".to_string()));
+        stack.push(StackValue::Integer(42));
+        let instruction = Instruction {
+            opcode: Opcode::StringConcat,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid substring parameters")]
+    fn test_string_substring_invalid_params() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024);
+        let mut memory = SegmentedMemory::new(1024);
+
+        stack.push(StackValue::String("Hello".to_string()));
+        let instruction = Instruction {
+            opcode: Opcode::StringSubstring,
+            operands: vec![-1, 3], // Negative start index
         };
         executor.execute(&instruction, &mut stack, &mut memory, 0);
     }
