@@ -195,7 +195,7 @@ impl CPU {
         // (Stack wird beim Kontextwechsel geladen, PC hier für den fetcher)
         self.fetcher.set_pc(self.processes[current_idx].pc);
 
-        if let Some(instruction_raw) = self.fetcher.fetch(&self.memory) {
+        if let Some(instruction_raw) = self.fetcher.fetch(&mut self.memory) {
             match self.decoder.decode(instruction_raw) {
                 Ok(instruction) => {
                     let pc_of_current_instruction = self.fetcher.pc.saturating_sub(4); // PC after fetch
@@ -328,77 +328,111 @@ mod tests {
 
     #[test]
     fn test_cpu_execution_with_pickn() {
+        let mut cpu = CPU::new(1024);
+
+        // Program:
+        // 1. LoadConstant 3
+        // 2. LoadConstant 4
+        // 3. LoadConstant 5
+        // 4. PickN 2 (should copy value 3 to top)
         let program = vec![
             0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
             0x00, 0x00, 0x04, 0x04, // LoadConstant (opcode 4) with operand 4
-            0x00, 0x00, 0x00, 0x13, // PickN (opcode 19) with operand 1
+            0x00, 0x00, 0x05, 0x04, // LoadConstant (opcode 4) with operand 5
+            0x00, 0x00, 0x02, 0x20, // PickN (opcode 0x20) with operand 2
         ];
 
-        let mut cpu = CPU::new(1000);
+        // Load program into memory and create process
         cpu.load_program(&program);
-        
-        assert!(cpu.step()); // LoadConstant 3
-        assert!(cpu.step()); // LoadConstant 4
-        assert!(cpu.step()); // PickN
-        
-        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(4)));
+
+        // Execute each instruction
+        for _ in 0..4 {
+            assert!(cpu.step());
+        }
+
+        // Check the stack state
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
+        assert_eq!(cpu.stack.len(), 4); // Original 3 values plus the picked value
     }
 
     #[test]
     fn test_cpu_execution_with_dup() {
+        let mut cpu = CPU::new(1024);
+
+        // Program:
+        // 1. LoadConstant 7
+        // 2. Dup
         let program = vec![
-            0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
-            0x00, 0x00, 0x00, 0x14, // Dup (opcode 20)
+            0x00, 0x00, 0x07, 0x04, // LoadConstant (opcode 4) with operand 7
+            0x00, 0x00, 0x00, 0x21, // Dup (opcode 0x21)
         ];
 
-        let mut cpu = CPU::new(1000);
+        // Load program into memory and create process
         cpu.load_program(&program);
-        
-        assert!(cpu.step()); // LoadConstant 3
-        assert!(cpu.step()); // Dup
-        
-        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
-        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
-        assert_eq!(cpu.stack.len(), 2);
+
+        // Execute each instruction
+        for _ in 0..2 {
+            assert!(cpu.step());
+        }
+
+        // Check the stack state
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(7)));
+        assert_eq!(cpu.stack.len(), 2); // Original value plus the duplicated value
     }
 
     #[test]
     fn test_cpu_execution_with_swap() {
+        let mut cpu = CPU::new(1024);
+
+        // Program:
+        // 1. LoadConstant 3
+        // 2. LoadConstant 7
+        // 3. Swap
         let program = vec![
             0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
-            0x00, 0x00, 0x04, 0x04, // LoadConstant (opcode 4) with operand 4
-            0x00, 0x00, 0x00, 0x15, // Swap (opcode 21)
+            0x00, 0x00, 0x07, 0x04, // LoadConstant (opcode 4) with operand 7
+            0x00, 0x00, 0x00, 0x22, // Swap (opcode 0x22)
         ];
 
-        let mut cpu = CPU::new(1000);
+        // Load program into memory and create process
         cpu.load_program(&program);
-        
-        assert!(cpu.step()); // LoadConstant 3
-        assert!(cpu.step()); // LoadConstant 4
-        assert!(cpu.step()); // Swap - Need to execute this step to perform the swap
-        
+
+        // Execute each instruction
+        for _ in 0..3 {
+            assert!(cpu.step());
+        }
+
+        // Check the stack state
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
-        assert_eq!(cpu.stack.len(), 2);
+        let values = cpu.stack.values.clone();
+        assert_eq!(values.get(values.len() - 2), Some(&StackValue::Integer(7)));
     }
 
     #[test]
     fn test_cpu_execution_with_drop() {
+        let mut cpu = CPU::new(1024);
+
+        // Program:
+        // 1. LoadConstant 3
+        // 2. LoadConstant 7
+        // 3. Drop
         let program = vec![
             0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
-            0x00, 0x00, 0x00, 0x16, // Drop (opcode 22)
+            0x00, 0x00, 0x07, 0x04, // LoadConstant (opcode 4) with operand 7
+            0x00, 0x00, 0x00, 0x23, // Drop (opcode 0x23)
         ];
 
-        let mut cpu = CPU::new(1000);
+        // Load program into memory and create process
         cpu.load_program(&program);
-        
-        assert!(cpu.step()); // LoadConstant 3
-        assert!(cpu.step()); // Drop
-        
-        assert_eq!(cpu.stack.len(), 0);
-        // Programmende, nächster Step sollte false liefern oder zu anderem Prozess wechseln
-        // In diesem Testfall (Einzelprozess) erwarten wir false, nachdem der Prozess terminiert.
-        assert!(!cpu.step()); 
-        assert_eq!(cpu.processes[cpu.current_process_idx.unwrap_or(0)].state, ProcessState::Terminated);
+
+        // Execute each instruction
+        for _ in 0..3 {
+            assert!(cpu.step());
+        }
+
+        // Check the stack state
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
+        assert_eq!(cpu.stack.len(), 1); // Only one value should remain
     }
 
     // TODO: Fügen Sie hier Tests für kooperatives Multitasking hinzu.

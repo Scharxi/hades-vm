@@ -71,6 +71,42 @@ impl ALU {
     pub fn power(&self, b_val: i32, a_val: i32) -> i32 {
         b_val.wrapping_pow(a_val as u32)
     }
+
+    /// Performs bitwise AND operation.
+    pub fn bit_and(&self, a: i32, b: i32) -> i32 {
+        a & b
+    }
+
+    /// Performs bitwise OR operation.
+    pub fn bit_or(&self, a: i32, b: i32) -> i32 {
+        a | b
+    }
+
+    /// Performs bitwise XOR operation.
+    pub fn bit_xor(&self, a: i32, b: i32) -> i32 {
+        a ^ b
+    }
+
+    /// Performs bitwise NOT operation (one's complement).
+    pub fn bit_not(&self, a: i32) -> i32 {
+        !a
+    }
+
+    /// Performs left shift operation.
+    pub fn shift_left(&self, value: i32, shift: i32) -> i32 {
+        if shift < 0 || shift >= 32 {
+            panic!("Invalid shift amount");
+        }
+        value << shift
+    }
+
+    /// Performs right shift operation.
+    pub fn shift_right(&self, value: i32, shift: i32) -> i32 {
+        if shift < 0 || shift >= 32 {
+            panic!("Invalid shift amount");
+        }
+        value >> shift
+    }
 }
 
 #[cfg(test)]
@@ -127,5 +163,48 @@ mod tests {
         // Division
         assert_eq!(alu.divide_float(35.0, 5.0), 7.0);
         assert!((alu.divide_float(10.0, 3.0) - 3.3333333).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_bitwise_operations() {
+        let alu = ALU;
+        
+        // Test BitAnd
+        assert_eq!(alu.bit_and(0b1100, 0b1010), 0b1000);
+        assert_eq!(alu.bit_and(-1, 5), 5);
+        
+        // Test BitOr
+        assert_eq!(alu.bit_or(0b1100, 0b1010), 0b1110);
+        assert_eq!(alu.bit_or(0, 5), 5);
+        
+        // Test BitXor
+        assert_eq!(alu.bit_xor(0b1100, 0b1010), 0b0110);
+        assert_eq!(alu.bit_xor(5, 5), 0);
+        
+        // Test BitNot
+        assert_eq!(alu.bit_not(0), -1);
+        assert_eq!(alu.bit_not(-1), 0);
+        
+        // Test ShiftLeft
+        assert_eq!(alu.shift_left(1, 2), 4);
+        assert_eq!(alu.shift_left(0b1010, 1), 0b10100);
+        
+        // Test ShiftRight
+        assert_eq!(alu.shift_right(4, 2), 1);
+        assert_eq!(alu.shift_right(0b1010, 1), 0b0101);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid shift amount")]
+    fn test_invalid_shift_left() {
+        let alu = ALU;
+        alu.shift_left(1, 32);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid shift amount")]
+    fn test_invalid_shift_right() {
+        let alu = ALU;
+        alu.shift_right(1, -1);
     }
 } 

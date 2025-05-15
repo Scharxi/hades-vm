@@ -844,6 +844,129 @@ impl InstructionExecutor {
 
                 ExecutionSignal::Continue
             }
+            Opcode::BitAnd => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("BitAnd instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                            let result = self.alu.bit_and(b_val, a_val);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in BitAnd operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::BitOr => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("BitOr instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                            let result = self.alu.bit_or(b_val, a_val);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in BitOr operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::BitXor => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("BitXor instruction requires 0 operands");
+                }
+
+                let a = stack.pop();
+                let b = stack.pop();
+
+                if let (Some(a), Some(b)) = (a, b) {
+                    match (a, b) {
+                        (StackValue::Integer(a_val), StackValue::Integer(b_val)) => {
+                            let result = self.alu.bit_xor(b_val, a_val);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in BitXor operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::BitNot => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("BitNot instruction requires 0 operands");
+                }
+
+                if let Some(value) = stack.pop() {
+                    match value {
+                        StackValue::Integer(val) => {
+                            let result = self.alu.bit_not(val);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in BitNot operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::ShiftLeft => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("ShiftLeft instruction requires 0 operands");
+                }
+
+                let shift = stack.pop();
+                let value = stack.pop();
+
+                if let (Some(shift), Some(value)) = (shift, value) {
+                    match (value, shift) {
+                        (StackValue::Integer(val), StackValue::Integer(shift_amount)) => {
+                            let result = self.alu.shift_left(val, shift_amount);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in ShiftLeft operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
+            Opcode::ShiftRight => {
+                if instruction.opcode.operand_count() > 0 {
+                    panic!("ShiftRight instruction requires 0 operands");
+                }
+
+                let shift = stack.pop();
+                let value = stack.pop();
+
+                if let (Some(shift), Some(value)) = (shift, value) {
+                    match (value, shift) {
+                        (StackValue::Integer(val), StackValue::Integer(shift_amount)) => {
+                            let result = self.alu.shift_right(val, shift_amount);
+                            stack.push(StackValue::Integer(result));
+                        }
+                        _ => panic!("Type mismatch in ShiftRight operation"),
+                    }
+                } else {
+                    panic!("Stack underflow");
+                }
+                ExecutionSignal::Continue
+            }
             // --- Platzhalter für neue Opcodes ---
             // Sie müssen diese Opcodes zu Ihrer Opcode-Enum hinzufügen (vermutlich in opcode.rs)
             Opcode::Yield => {
@@ -1140,5 +1263,103 @@ mod tests {
         let signal = executor.execute(&jz_instr, &mut stack, &mut memory, current_pc);
         assert_eq!(signal, ExecutionSignal::Continue);
         assert_eq!(stack.len(), 0); // Value should be popped
+    }
+
+    #[test]
+    fn test_bitwise_instructions() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024); // Provide stack size
+        let mut memory = SegmentedMemory::new(1024); // Provide memory size
+
+        // Test BitAnd
+        stack.push(StackValue::Integer(0b1100));
+        stack.push(StackValue::Integer(0b1010));
+        let instruction = Instruction {
+            opcode: Opcode::BitAnd,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Integer(0b1000)));
+
+        // Test BitOr
+        stack.push(StackValue::Integer(0b1100));
+        stack.push(StackValue::Integer(0b1010));
+        let instruction = Instruction {
+            opcode: Opcode::BitOr,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Integer(0b1110)));
+
+        // Test BitXor
+        stack.push(StackValue::Integer(0b1100));
+        stack.push(StackValue::Integer(0b1010));
+        let instruction = Instruction {
+            opcode: Opcode::BitXor,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Integer(0b0110)));
+
+        // Test BitNot
+        stack.push(StackValue::Integer(0));
+        let instruction = Instruction {
+            opcode: Opcode::BitNot,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Integer(-1)));
+
+        // Test ShiftLeft
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Integer(2));
+        let instruction = Instruction {
+            opcode: Opcode::ShiftLeft,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Integer(4)));
+
+        // Test ShiftRight
+        stack.push(StackValue::Integer(4));
+        stack.push(StackValue::Integer(2));
+        let instruction = Instruction {
+            opcode: Opcode::ShiftRight,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+        assert_eq!(stack.pop(), Some(StackValue::Integer(1)));
+    }
+
+    #[test]
+    #[should_panic(expected = "Type mismatch in BitAnd operation")]
+    fn test_bitand_type_mismatch() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024); // Provide stack size
+        let mut memory = SegmentedMemory::new(1024); // Provide memory size
+
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Float(2.0));
+        let instruction = Instruction {
+            opcode: Opcode::BitAnd,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid shift amount")]
+    fn test_invalid_shift() {
+        let mut executor = InstructionExecutor::new();
+        let mut stack = Stack::new(1024); // Provide stack size
+        let mut memory = SegmentedMemory::new(1024); // Provide memory size
+
+        stack.push(StackValue::Integer(1));
+        stack.push(StackValue::Integer(32)); // Invalid shift amount
+        let instruction = Instruction {
+            opcode: Opcode::ShiftLeft,
+            operands: vec![],
+        };
+        executor.execute(&instruction, &mut stack, &mut memory, 0);
     }
 }

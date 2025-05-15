@@ -161,20 +161,44 @@ pub struct Modulo;
 pub struct Power;
 
 #[derive(IntoRaw)]
-#[opcode = 0x13]
+#[opcode = 0x20]
 pub struct PickN(pub i32);
 
 #[derive(IntoRaw)]
-#[opcode = 0x14]
+#[opcode = 0x21]
 pub struct Dup;
 
 #[derive(IntoRaw)]
-#[opcode = 0x15]
+#[opcode = 0x22]
 pub struct Swap;
 
 #[derive(IntoRaw)]
-#[opcode = 0x16]
+#[opcode = 0x23]
 pub struct Drop;
+
+#[derive(IntoRaw)]
+#[opcode = 0x13]
+pub struct BitAnd;
+
+#[derive(IntoRaw)]
+#[opcode = 0x14]
+pub struct BitOr;
+
+#[derive(IntoRaw)]
+#[opcode = 0x15]
+pub struct BitXor;
+
+#[derive(IntoRaw)]
+#[opcode = 0x16]
+pub struct BitNot;
+
+#[derive(IntoRaw)]
+#[opcode = 0x17]
+pub struct ShiftLeft;
+
+#[derive(IntoRaw)]
+#[opcode = 0x18]
+pub struct ShiftRight;
 
 #[cfg(test)]
 mod tests {
@@ -247,11 +271,29 @@ mod tests {
 
     #[test]
     fn test_raw_instruction_into_instruction() {
-        // Create a Store instruction (0x02) with operand 0x010203
-        let raw = RawInstruction::from_bytes(0x01, 0x02, 0x03, 0x02);
+        // Test PickN instruction (0x20) with operand 0x010203
+        let raw = RawInstruction::from_bytes(0x01, 0x02, 0x03, 0x20);
         let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
-        assert_eq!(instruction.opcode, Opcode::Store);
+        assert_eq!(instruction.opcode, Opcode::PickN);
         assert_eq!(instruction.operands, vec![0x010203]);
+
+        // Test Dup instruction (0x21)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x21);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::Dup);
+        assert!(instruction.operands.is_empty());
+
+        // Test Swap instruction (0x22)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x22);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::Swap);
+        assert!(instruction.operands.is_empty());
+
+        // Test Drop instruction (0x23)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x23);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::Drop);
+        assert!(instruction.operands.is_empty());
     }
 
     #[test]
@@ -268,6 +310,81 @@ mod tests {
         assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::Store);
         assert_eq!(raw.operand(), 42);
         assert!(raw.has_operands().expect("Failed to check operands"));
+    }
+
+    #[test]
+    fn test_bitwise_instructions() {
+        // Test BitAnd
+        let bitand = BitAnd;
+        let raw = bitand.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::BitAnd);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test raw instruction for BitAnd (0x13)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x13);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::BitAnd);
+        assert!(instruction.operands.is_empty());
+
+        // Test BitOr
+        let bitor = BitOr;
+        let raw = bitor.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::BitOr);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test raw instruction for BitOr (0x14)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x14);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::BitOr);
+        assert!(instruction.operands.is_empty());
+
+        // Test BitXor
+        let bitxor = BitXor;
+        let raw = bitxor.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::BitXor);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test raw instruction for BitXor (0x15)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x15);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::BitXor);
+        assert!(instruction.operands.is_empty());
+
+        // Test BitNot
+        let bitnot = BitNot;
+        let raw = bitnot.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::BitNot);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test raw instruction for BitNot (0x16)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x16);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::BitNot);
+        assert!(instruction.operands.is_empty());
+
+        // Test ShiftLeft
+        let shiftleft = ShiftLeft;
+        let raw = shiftleft.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::ShiftLeft);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test raw instruction for ShiftLeft (0x17)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x17);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::ShiftLeft);
+        assert!(instruction.operands.is_empty());
+
+        // Test ShiftRight
+        let shiftright = ShiftRight;
+        let raw = shiftright.into_raw();
+        assert_eq!(raw.opcode().expect("Failed to get opcode"), Opcode::ShiftRight);
+        assert!(!raw.has_operands().expect("Failed to check operands"));
+
+        // Test raw instruction for ShiftRight (0x18)
+        let raw = RawInstruction::from_bytes(0x00, 0x00, 0x00, 0x18);
+        let instruction: Instruction = raw.try_into().expect("Failed to convert raw to instruction");
+        assert_eq!(instruction.opcode, Opcode::ShiftRight);
+        assert!(instruction.operands.is_empty());
     }
 }
 
