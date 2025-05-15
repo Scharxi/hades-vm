@@ -1,0 +1,17 @@
+fn swap_and_add(a: i32, b: i32) -> i32 {
+    b + a
+}
+
+fn duplicate_and_mul(x: i32) -> i32 {
+    x * x
+}
+
+fn pick_third(a: i32, b: i32, c: i32) -> i32 {
+    a
+}
+
+fn main() -> i32 {
+    let x = swap_and_add(5, 3);
+    let y = duplicate_and_mul(x);
+    pick_third(y, 100, 200)
+} 

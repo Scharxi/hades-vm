@@ -111,7 +111,79 @@ impl<'a> Parser<'a> {
         
         let mut statements = Vec::new();
         while !self.check(TokenKind::RBrace) && !self.check(TokenKind::EOF) {
-            statements.push(self.parse_statement()?);
+            let is_last = self.peek_is_last_statement();
+            
+            match self.current.kind {
+                TokenKind::Let => {
+                    statements.push(self.parse_statement()?);
+                }
+                TokenKind::Return => {
+                    statements.push(self.parse_statement()?);
+                }
+                TokenKind::If => {
+                    statements.push(self.parse_statement()?);
+                }
+                TokenKind::When => {
+                    statements.push(self.parse_statement()?);
+                }
+                TokenKind::While => {
+                    statements.push(self.parse_statement()?);
+                }
+                TokenKind::Identifier(_) => {
+                    let name = self.parse_identifier()?;
+                    if self.check(TokenKind::Assign) {
+                        self.advance();
+                        let value = self.parse_expression()?;
+                        self.expect(TokenKind::Semicolon)?;
+                        statements.push(Statement::Assignment { target: name, value });
+                    } else {
+                        let mut expr = Expression::Variable(name);
+                        
+                        // Parse any postfix operations
+                        loop {
+                            match self.current.kind {
+                                TokenKind::LParen => {
+                                    self.advance();
+                                    let arguments = self.parse_separated_list(TokenKind::RParen, |p| p.parse_expression())?;
+                                    expr = Expression::Call {
+                                        function: Box::new(expr),
+                                        arguments,
+                                    };
+                                }
+                                TokenKind::Plus | TokenKind::Minus | TokenKind::Star | TokenKind::Slash |
+                                TokenKind::Eq | TokenKind::NotEq | TokenKind::Lt | TokenKind::LtEq |
+                                TokenKind::Gt | TokenKind::GtEq => {
+                                    let (_, op) = self.get_binary_operator().unwrap();
+                                    self.advance();
+                                    let rhs = self.parse_expression()?;
+                                    expr = Expression::Binary {
+                                        left: Box::new(expr),
+                                        operator: op,
+                                        right: Box::new(rhs),
+                                    };
+                                }
+                                _ => break,
+                            }
+                        }
+                        
+                        if !is_last {
+                            self.expect(TokenKind::Semicolon)?;
+                            statements.push(Statement::Expression(expr));
+                        } else {
+                            statements.push(Statement::Return(Some(expr)));
+                        }
+                    }
+                }
+                _ => {
+                    let expr = self.parse_expression()?;
+                    if !is_last {
+                        self.expect(TokenKind::Semicolon)?;
+                        statements.push(Statement::Expression(expr));
+                    } else {
+                        statements.push(Statement::Return(Some(expr)));
+                    }
+                }
+            }
         }
         
         self.expect(TokenKind::RBrace)?;
@@ -169,154 +241,82 @@ impl<'a> Parser<'a> {
                 
                 Ok(Statement::Return(value))
             }
-            TokenKind::If => self.parse_if_statement(),
+            TokenKind::If => {
+                self.advance();
+                let condition = self.parse_expression()?;
+                let then_branch = self.parse_block()?;
+                let else_branch = if self.check(TokenKind::Else) {
+                    self.advance();
+                    Some(self.parse_block()?)
+                } else {
+                    None
+                };
+                Ok(Statement::If {
+                    condition,
+                    then_branch,
+                    else_branch,
+                })
+            }
             TokenKind::When => {
                 let expr = self.parse_when_expression()?;
-                if self.check(TokenKind::Semicolon) {
+                if !self.peek_is_last_statement() {
+                    self.expect(TokenKind::Semicolon)?;
+                }
+                Ok(Statement::Expression(expr))
+            }
+            TokenKind::While => {
+                self.advance();
+                let condition = self.parse_expression()?;
+                let body = self.parse_block()?;
+                Ok(Statement::While { condition, body })
+            }
+            TokenKind::Identifier(_) => {
+                let name = self.parse_identifier()?;
+                if self.check(TokenKind::Assign) {
                     self.advance();
-                    Ok(Statement::Expression(expr))
+                    let value = self.parse_expression()?;
+                    self.expect(TokenKind::Semicolon)?;
+                    Ok(Statement::Assignment { target: name, value })
                 } else {
+                    let expr = self.parse_postfix_expression_with_base(Expression::Variable(name))?;
+                    if !self.peek_is_last_statement() {
+                        self.expect(TokenKind::Semicolon)?;
+                    }
                     Ok(Statement::Expression(expr))
                 }
             }
             _ => {
                 let expr = self.parse_expression()?;
-                self.expect(TokenKind::Semicolon)?;
+                if !self.peek_is_last_statement() {
+                    self.expect(TokenKind::Semicolon)?;
+                }
                 Ok(Statement::Expression(expr))
             }
         }
     }
     
-    fn parse_if_statement(&mut self) -> Result<Statement> {
-        self.advance(); // Skip 'if'
-        
-        let condition = self.parse_expression()?;
-        let then_branch = self.parse_block()?;
-        
-        let else_branch = if self.check(TokenKind::Else) {
-            self.advance();
-            Some(self.parse_block()?)
-        } else {
-            None
-        };
-        
-        Ok(Statement::If {
-            condition,
-            then_branch,
-            else_branch,
-        })
-    }
-    
-    fn parse_when_expression(&mut self) -> Result<Expression> {
-        self.advance(); // Skip 'when'
-        
-        self.expect(TokenKind::LParen)?;
-        let subject = Box::new(self.parse_expression()?);
-        self.expect(TokenKind::RParen)?;
-        
-        self.expect(TokenKind::LBrace)?;
-        
-        let mut arms = Vec::new();
-        while !self.check(TokenKind::RBrace) && !self.check(TokenKind::EOF) {
-            arms.push(self.parse_when_arm()?);
-        }
-        
-        self.expect(TokenKind::RBrace)?;
-        
-        Ok(Expression::When { subject, arms })
-    }
-    
-    fn parse_when_arm(&mut self) -> Result<WhenArm> {
-        let pattern = self.parse_pattern()?;
-        
-        let guard = if self.check(TokenKind::If) {
-            self.advance();
-            Some(self.parse_expression()?)
-        } else {
-            None
-        };
-        
-        self.expect(TokenKind::FatArrow)?;
-        
-        let body = self.parse_block()?;
-        
-        Ok(WhenArm {
-            pattern,
-            guard,
-            body,
-        })
-    }
-    
-    fn parse_pattern(&mut self) -> Result<Pattern> {
-        match self.current.kind {
-            TokenKind::Integer(n) => {
-                self.advance();
-                Ok(Pattern::Literal(Literal::Integer(n)))
-            }
-            TokenKind::Float(f) => {
-                self.advance();
-                Ok(Pattern::Literal(Literal::Float(f)))
-            }
-            TokenKind::String(ref s) => {
-                let s = s.clone();
-                self.advance();
-                Ok(Pattern::Literal(Literal::String(s)))
-            }
-            TokenKind::Boolean(b) => {
-                self.advance();
-                Ok(Pattern::Literal(Literal::Boolean(b)))
-            }
-            TokenKind::Identifier(_) => {
-                let name = self.parse_identifier()?;
-                if self.check(TokenKind::LParen) {
-                    self.advance();
-                    let fields = self.parse_separated_list(TokenKind::RParen, |p| p.parse_pattern())?;
-                    Ok(Pattern::Constructor { name, fields })
-                } else {
-                    Ok(Pattern::Identifier(name))
-                }
-            }
-            TokenKind::Is => {
-                self.advance();
-                let type_ = self.parse_type()?;
-                Ok(Pattern::Is(type_))
-            }
-            TokenKind::Underscore => {
-                self.advance();
-                Ok(Pattern::Wildcard)
-            }
-            _ => Err(ParseError::UnexpectedToken {
-                expected: "pattern",
-                found: self.current.kind.clone(),
-                span: self.current.span.clone(),
-            }),
-        }
-    }
-    
     fn parse_expression(&mut self) -> Result<Expression> {
-        self.parse_binary_expression(0)
-    }
-    
-    fn parse_binary_expression(&mut self, min_precedence: u8) -> Result<Expression> {
-        let mut lhs = self.parse_unary_expression()?;
+        let mut expr = self.parse_unary_expression()?;
         
-        while let Some((precedence, op)) = self.get_binary_operator() {
-            if precedence < min_precedence {
-                break;
+        loop {
+            match self.current.kind {
+                TokenKind::Plus | TokenKind::Minus | TokenKind::Star | TokenKind::Slash |
+                TokenKind::Eq | TokenKind::NotEq | TokenKind::Lt | TokenKind::LtEq |
+                TokenKind::Gt | TokenKind::GtEq => {
+                    let (_, op) = self.get_binary_operator().unwrap();
+                    self.advance();
+                    let rhs = self.parse_unary_expression()?;
+                    expr = Expression::Binary {
+                        left: Box::new(expr),
+                        operator: op,
+                        right: Box::new(rhs),
+                    };
+                }
+                _ => break,
             }
-            
-            self.advance();
-            
-            let rhs = self.parse_binary_expression(precedence + 1)?;
-            
-            lhs = Expression::Binary {
-                left: Box::new(lhs),
-                operator: op,
-                right: Box::new(rhs),
-            };
         }
         
-        Ok(lhs)
+        Ok(expr)
     }
     
     fn parse_unary_expression(&mut self) -> Result<Expression> {
@@ -333,8 +333,11 @@ impl<'a> Parser<'a> {
     }
     
     fn parse_postfix_expression(&mut self) -> Result<Expression> {
-        let mut expr = self.parse_primary_expression()?;
-        
+        let expr = self.parse_primary_expression()?;
+        self.parse_postfix_expression_with_base(expr)
+    }
+    
+    fn parse_postfix_expression_with_base(&mut self, mut expr: Expression) -> Result<Expression> {
         loop {
             match self.current.kind {
                 TokenKind::LParen => {
@@ -524,16 +527,19 @@ impl<'a> Parser<'a> {
     
     fn get_binary_operator(&self) -> Option<(u8, BinaryOp)> {
         let result = match self.current.kind {
-            TokenKind::Plus => (1, BinaryOp::Add),
-            TokenKind::Minus => (1, BinaryOp::Sub),
-            TokenKind::Star => (2, BinaryOp::Mul),
-            TokenKind::Slash => (2, BinaryOp::Div),
-            TokenKind::Eq => (0, BinaryOp::Eq),
-            TokenKind::NotEq => (0, BinaryOp::NotEq),
-            TokenKind::Lt => (0, BinaryOp::Lt),
-            TokenKind::LtEq => (0, BinaryOp::LtEq),
-            TokenKind::Gt => (0, BinaryOp::Gt),
-            TokenKind::GtEq => (0, BinaryOp::GtEq),
+            // Multiplication and division have highest precedence (3)
+            TokenKind::Star => (3, BinaryOp::Mul),
+            TokenKind::Slash => (3, BinaryOp::Div),
+            // Addition and subtraction have medium precedence (2)
+            TokenKind::Plus => (2, BinaryOp::Add),
+            TokenKind::Minus => (2, BinaryOp::Sub),
+            // Comparison operators have lowest precedence (1)
+            TokenKind::Eq => (1, BinaryOp::Eq),
+            TokenKind::NotEq => (1, BinaryOp::NotEq),
+            TokenKind::Lt => (1, BinaryOp::Lt),
+            TokenKind::LtEq => (1, BinaryOp::LtEq),
+            TokenKind::Gt => (1, BinaryOp::Gt),
+            TokenKind::GtEq => (1, BinaryOp::GtEq),
             _ => return None,
         };
         Some(result)
@@ -771,6 +777,118 @@ impl<'a> Parser<'a> {
             trait_name,
             methods,
         })
+    }
+
+    fn peek_is_last_statement(&mut self) -> bool {
+        let mut lexer = self.lexer.clone();
+        let mut depth = 0;
+        let mut found_semicolon = false;
+        
+        while let Some(token) = lexer.next() {
+            match token.kind {
+                TokenKind::LBrace => depth += 1,
+                TokenKind::RBrace => {
+                    if depth == 0 {
+                        return !found_semicolon;
+                    }
+                    depth -= 1;
+                }
+                TokenKind::Semicolon => {
+                    if depth == 0 {
+                        found_semicolon = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        
+        !found_semicolon
+    }
+
+    fn parse_when_expression(&mut self) -> Result<Expression> {
+        self.advance(); // Skip 'when'
+        
+        self.expect(TokenKind::LParen)?;
+        let subject = Box::new(self.parse_expression()?);
+        self.expect(TokenKind::RParen)?;
+        
+        self.expect(TokenKind::LBrace)?;
+        
+        let mut arms = Vec::new();
+        while !self.check(TokenKind::RBrace) && !self.check(TokenKind::EOF) {
+            arms.push(self.parse_when_arm()?);
+        }
+        
+        self.expect(TokenKind::RBrace)?;
+        
+        Ok(Expression::When { subject, arms })
+    }
+
+    fn parse_when_arm(&mut self) -> Result<WhenArm> {
+        let pattern = self.parse_pattern()?;
+        
+        let guard = if self.check(TokenKind::If) {
+            self.advance();
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        
+        self.expect(TokenKind::FatArrow)?;
+        
+        let body = self.parse_block()?;
+        
+        Ok(WhenArm {
+            pattern,
+            guard,
+            body,
+        })
+    }
+
+    fn parse_pattern(&mut self) -> Result<Pattern> {
+        match self.current.kind {
+            TokenKind::Integer(n) => {
+                self.advance();
+                Ok(Pattern::Literal(Literal::Integer(n)))
+            }
+            TokenKind::Float(f) => {
+                self.advance();
+                Ok(Pattern::Literal(Literal::Float(f)))
+            }
+            TokenKind::String(ref s) => {
+                let s = s.clone();
+                self.advance();
+                Ok(Pattern::Literal(Literal::String(s)))
+            }
+            TokenKind::Boolean(b) => {
+                self.advance();
+                Ok(Pattern::Literal(Literal::Boolean(b)))
+            }
+            TokenKind::Identifier(_) => {
+                let name = self.parse_identifier()?;
+                if self.check(TokenKind::LParen) {
+                    self.advance();
+                    let fields = self.parse_separated_list(TokenKind::RParen, |p| p.parse_pattern())?;
+                    Ok(Pattern::Constructor { name, fields })
+                } else {
+                    Ok(Pattern::Identifier(name))
+                }
+            }
+            TokenKind::Is => {
+                self.advance();
+                let type_ = self.parse_type()?;
+                Ok(Pattern::Is(type_))
+            }
+            TokenKind::Underscore => {
+                self.advance();
+                Ok(Pattern::Wildcard)
+            }
+            _ => Err(ParseError::UnexpectedToken {
+                expected: "pattern",
+                found: self.current.kind.clone(),
+                span: self.current.span.clone(),
+            }),
+        }
     }
 }
 

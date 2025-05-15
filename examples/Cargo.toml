@@ -1,0 +1,12 @@
+[package]
+name = "hades-examples"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vm = { path = "../vm" }
+nyx-compiler = { path = "../nyx-compiler" }
+
+[[bin]]
+name = "run_examples"
+path = "src/bin/run_examples.rs" 

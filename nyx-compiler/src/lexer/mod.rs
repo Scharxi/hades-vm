@@ -4,6 +4,7 @@ pub use token::{Token, TokenKind, Span};
 use std::str::Chars;
 use std::iter::Peekable;
 
+#[derive(Clone)]
 pub struct Lexer<'a> {
     input: Peekable<Chars<'a>>,
     position: usize,
@@ -56,7 +57,23 @@ impl<'a> Lexer<'a> {
                     '+' => self.single_char_token(TokenKind::Plus),
                     '-' => self.read_minus_or_arrow(),
                     '*' => self.single_char_token(TokenKind::Star),
-                    '/' => self.single_char_token(TokenKind::Slash),
+                    '/' => {
+                        self.advance();
+                        match self.peek() {
+                            Some('/') => {
+                                // Line comment
+                                self.advance();
+                                while let Some(c) = self.peek() {
+                                    if c == '\n' {
+                                        break;
+                                    }
+                                    self.advance();
+                                }
+                                self.next_token()
+                            }
+                            _ => self.create_token(TokenKind::Slash, start_pos, start_line, start_column)
+                        }
+                    },
                     '=' => self.read_equals(),
                     '<' => self.read_less_than(),
                     '>' => self.read_greater_than(),
@@ -256,6 +273,7 @@ impl<'a> Lexer<'a> {
             "type" => TokenKind::Type,
             "const" => TokenKind::Const,
             "for" => TokenKind::For,
+            "while" => TokenKind::While,
             "true" => TokenKind::Boolean(true),
             "false" => TokenKind::Boolean(false),
             _ => TokenKind::Identifier(identifier),

@@ -1,0 +1,25 @@
+fn identity(x: i32) -> i32 {
+    x
+}
+
+fn add_and_return(a: i32, b: i32) -> i32 {
+    let sum = a + b;
+    sum
+}
+
+fn nested_calls(x: i32) -> i32 {
+    let y = identity(x);
+    let z = add_and_return(y, 5);
+    identity(z)
+}
+
+fn chain_calls(x: i32) -> i32 {
+    identity(add_and_return(x, nested_calls(x)))
+}
+
+fn main() -> i32 {
+    let a = identity(42);
+    let b = add_and_return(a, 8);
+    let c = nested_calls(b);
+    chain_calls(c)
+} 

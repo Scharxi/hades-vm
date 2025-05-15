@@ -166,6 +166,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hades-examples"
+version = "0.1.0"
+dependencies = [
+ "nyx-compiler",
+ "vm",
+]
+
+[[package]]
 name = "hades-ir"
 version = "0.1.0"
 dependencies = [

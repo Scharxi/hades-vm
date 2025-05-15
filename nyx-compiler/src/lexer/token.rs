@@ -19,6 +19,7 @@ pub enum TokenKind {
     Type,
     Const,
     For,
+    While,
     
     // Literals
     Integer(i64),

@@ -9,8 +9,10 @@ members = [
     "intoraw-derive",
     "hades-ir",
     "hades-ir-interpreter",
-    "nyx-compiler"
-, "hades-cli"]
+    "nyx-compiler",
+    "hades-cli",
+    "examples"
+]
 
 [lib]
 name = "vm"

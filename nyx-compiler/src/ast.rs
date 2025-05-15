@@ -130,6 +130,14 @@ pub enum Statement {
         subject: Expression,
         arms: Vec<WhenArm>,
     },
+    While {
+        condition: Expression,
+        body: Block,
+    },
+    Assignment {
+        target: String,
+        value: Expression,
+    },
 }
 
 #[derive(Debug, Clone)]
