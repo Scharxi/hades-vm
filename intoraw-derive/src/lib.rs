@@ -114,43 +114,72 @@ pub fn derive_into_raw(input: TokenStream) -> TokenStream {
         ).to_compile_error().into();
     }
 
-    // Determine if the struct has a field that should be used as an operand
-    let has_operand = match &input.data {
+    // Get the number of fields
+    let field_count = match &input.data {
         Data::Struct(data_struct) => match &data_struct.fields {
-            Fields::Named(fields) => !fields.named.is_empty(),
-            Fields::Unnamed(fields) => !fields.unnamed.is_empty(),
-            Fields::Unit => false,
+            Fields::Named(fields) => fields.named.len(),
+            Fields::Unnamed(fields) => fields.unnamed.len(),
+            Fields::Unit => 0,
         },
-        _ => false, // This shouldn't happen due to the check above
+        _ => 0,
     };
     
     // Generate the implementation
     let generated_code = if let Some(opcode) = opcode_value {
-        if has_operand {
-            // For instructions with operands (like Store)
-            quote! {
-                impl crate::instruction::IntoRaw for #name {
-                    fn into_raw(self) -> crate::instruction::RawInstruction {
-                        // Extract the operand from the first field
-                        let operand = self.0;
-                        let b0 = ((operand >> 16) & 0xFF) as u8;
-                        let b1 = ((operand >> 8) & 0xFF) as u8;
-                        let b2 = (operand & 0xFF) as u8;
-                        
-                        // Create instruction with the appropriate opcode
-                        crate::instruction::RawInstruction::from_bytes(b0, b1, b2, #opcode)
+        match field_count {
+            0 => {
+                // For instructions without operands (like Add)
+                quote! {
+                    impl crate::instruction::IntoRaw for #name {
+                        fn into_raw(self) -> crate::instruction::RawInstruction {
+                            // Create instruction with only the opcode, no operands
+                            crate::instruction::RawInstruction::from_bytes(0x00, 0x00, 0x00, #opcode)
+                        }
                     }
                 }
-            }
-        } else {
-            // For instructions without operands (like Add)
-            quote! {
-                impl crate::instruction::IntoRaw for #name {
-                    fn into_raw(self) -> crate::instruction::RawInstruction {
-                        // Create instruction with only the opcode, no operands
-                        crate::instruction::RawInstruction::from_bytes(0x00, 0x00, 0x00, #opcode)
+            },
+            1 => {
+                // For instructions with one operand (like Store)
+                quote! {
+                    impl crate::instruction::IntoRaw for #name {
+                        fn into_raw(self) -> crate::instruction::RawInstruction {
+                            // Extract the operand from the first field
+                            let operand = self.0;
+                            let b0 = ((operand >> 16) & 0xFF) as u8;
+                            let b1 = ((operand >> 8) & 0xFF) as u8;
+                            let b2 = (operand & 0xFF) as u8;
+                            
+                            // Create instruction with the appropriate opcode
+                            crate::instruction::RawInstruction::from_bytes(b0, b1, b2, #opcode)
+                        }
                     }
                 }
+            },
+            2 => {
+                // For instructions with two operands (like StringSubstring)
+                quote! {
+                    impl crate::instruction::IntoRaw for #name {
+                        fn into_raw(self) -> crate::instruction::RawInstruction {
+                            // Pack the two operands into 24 bits (12 bits each)
+                            let operand1 = (self.0 & 0xFFF) << 12;
+                            let operand2 = self.1 & 0xFFF;
+                            let packed = operand1 | operand2;
+                            
+                            let b0 = ((packed >> 16) & 0xFF) as u8;
+                            let b1 = ((packed >> 8) & 0xFF) as u8;
+                            let b2 = (packed & 0xFF) as u8;
+                            
+                            // Create instruction with the appropriate opcode
+                            crate::instruction::RawInstruction::from_bytes(b0, b1, b2, #opcode)
+                        }
+                    }
+                }
+            },
+            _ => {
+                return syn::Error::new_spanned(
+                    name,
+                    "Instructions with more than 2 operands are not supported"
+                ).to_compile_error().into();
             }
         }
     } else {

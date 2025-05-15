@@ -36,8 +36,16 @@ impl RawInstruction {
 
     pub fn get_operands(&self) -> Result<Vec<i32>, InvalidOpcodeError> {
         let mut operands = Vec::new();
-        if self.has_operands()? {
-            operands.push(self.operand());
+        let operand_count = self.operand_count()?;
+        if operand_count > 0 {
+            let raw_operand = self.operand();
+            if operand_count == 1 {
+                operands.push(raw_operand);
+            } else if operand_count == 2 {
+                // For two operands, split the 24 bits into two 12-bit fields
+                operands.push((raw_operand >> 12) & 0xfff); // First 12 bits
+                operands.push(raw_operand & 0xfff); // Last 12 bits
+            }
         }
         Ok(operands)
     }
