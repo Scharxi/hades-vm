@@ -12,6 +12,7 @@ petgraph = "0.6"     # For control flow graph
 log = "0.4"         # For logging
 once_cell = "1.18"   # For lazy statics
 indexmap = "2.1"     # For ordered maps
+byteorder = "1.4"    # For binary serialization
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]

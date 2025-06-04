@@ -10,3 +10,4 @@ nyx-compiler = { path = "../nyx-compiler" }
 clap = { version = "4.5.1", features = ["derive"] }
 anyhow = "1.0"
 thiserror = "1.0"
+tempfile = "3.7.0"

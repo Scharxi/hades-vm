@@ -129,6 +129,13 @@ impl BytecodeGenerator {
         
         Ok(())
     }
+    
+    /// Emit raw bytes to the bytecode (for executable generation)
+    pub fn emit_raw_bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        self.bytecode.extend_from_slice(bytes);
+        self.offset += bytes.len();
+        Ok(())
+    }
 }
 
 impl Default for BytecodeGenerator {

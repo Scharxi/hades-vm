@@ -7,12 +7,14 @@ pub mod lexer;
 pub mod parser;
 pub mod ast;
 pub mod codegen;
+pub mod hex_compiler;
 
 /// Re-export commonly used types
 pub use lexer::{Lexer, Token};
 pub use parser::{Parser, ParseError};
 pub use ast::*;
 pub use codegen::{CodeGenerator, CodeGenError};
+pub use hex_compiler::{HexCompiler, HexCompilerError, compile_source_to_hex_file};
 
 /// Initialize the logger for the compiler
 pub fn init_logger() {

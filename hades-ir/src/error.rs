@@ -31,6 +31,14 @@ pub enum Error {
     #[error("VM error: {0}")]
     VMError(String),
     
+    /// Executable format error
+    #[error("Executable error: {0}")]
+    ExecutableError(String),
+    
+    /// I/O error
+    #[error("I/O error: {0}")]
+    IoError(#[from] std::io::Error),
+    
     /// Other error
     #[error("Other error: {0}")]
     Other(String),
@@ -52,4 +60,9 @@ pub fn validation_error(msg: impl Into<String>) -> Error {
 /// Create a new construction error
 pub fn construction_error(msg: impl Into<String>) -> Error {
     Error::ConstructionError(msg.into())
+}
+
+/// Create a new executable error
+pub fn executable_error(msg: impl Into<String>) -> Error {
+    Error::ExecutableError(msg.into())
 } 
