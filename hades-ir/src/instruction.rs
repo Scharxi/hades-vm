@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use crate::{
     types::Type,
     value::{Value, ValueId},
-    error::Result,
 };
 
 /// Represents an operation in the IR.

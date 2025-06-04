@@ -1,14 +1,3 @@
-use std::sync::Arc;
-use hades_ir::{
-    Type,
-    Value,
-    Function,
-    BasicBlock,
-    Instruction,
-    Operation,
-    CodeGenerator,
-    Linkage,
-};
 use nyx_compiler::{
     parser::Parser,
     ast::*,

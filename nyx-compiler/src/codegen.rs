@@ -1,7 +1,7 @@
 use crate::ast::*;
 use hades_ir::{
     Context, Module, Function as IRFunction, Type as IRType, Value as IRValue,
-    Instruction as IRInstruction, Operation, Linkage, CodeGenerator as IRCodeGenerator,
+    Instruction as IRInstruction, Operation, Linkage,
     BytecodeGenerator,
 };
 use std::collections::HashMap;
