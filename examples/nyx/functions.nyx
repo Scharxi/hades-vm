@@ -1,25 +1,25 @@
-fn identity(x: i32) -> i32 {
-    x
+fun identity(x: Int): Int {
+    return x
 }
 
-fn add_and_return(a: i32, b: i32) -> i32 {
-    let sum = a + b;
-    sum
+fun addAndReturn(a: Int, b: Int): Int {
+    val sum = a + b
+    return sum
 }
 
-fn nested_calls(x: i32) -> i32 {
-    let y = identity(x);
-    let z = add_and_return(y, 5);
-    identity(z)
+fun nestedCalls(x: Int): Int {
+    val y = identity(x)
+    val z = addAndReturn(y, 5)
+    return identity(z)
 }
 
-fn chain_calls(x: i32) -> i32 {
-    identity(add_and_return(x, nested_calls(x)))
+fun chainCalls(x: Int): Int {
+    return identity(addAndReturn(x, nestedCalls(x)))
 }
 
-fn main() -> i32 {
-    let a = identity(42);
-    let b = add_and_return(a, 8);
-    let c = nested_calls(b);
-    chain_calls(c)
+fun main(): Int {
+    val a = identity(42)
+    val b = addAndReturn(a, 8)
+    val c = nestedCalls(b)
+    return chainCalls(c)
 } 

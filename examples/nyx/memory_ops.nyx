@@ -1,31 +1,31 @@
-fn store_and_load(x: i32) -> i32 {
-    let addr = alloc(1);
-    store(addr, x);
-    load(addr)
+fun storeAndLoad(x: Int): Int {
+    val addr = alloc(1)
+    store(addr, x)
+    return load(addr)
 }
 
-fn array_sum(size: i32) -> i32 {
-    let addr = alloc(size);
-    let mut i = 0;
-    let mut sum = 0;
+fun arraySum(size: Int): Int {
+    val addr = alloc(size)
+    var i = 0
+    var sum = 0
     
-    while i < size {
-        store(addr + i, i);
-        i = i + 1;
+    while (i < size) {
+        store(addr + i, i)
+        i = i + 1
     }
     
-    i = 0;
-    while i < size {
-        sum = sum + load(addr + i);
-        i = i + 1;
+    i = 0
+    while (i < size) {
+        sum = sum + load(addr + i)
+        i = i + 1
     }
     
-    free(addr);
-    sum
+    free(addr)
+    return sum
 }
 
-fn main() -> i32 {
-    let x = store_and_load(42);
-    let sum = array_sum(5);
-    x + sum
+fun main(): Int {
+    val x = storeAndLoad(42)
+    val sum = arraySum(5)
+    return x + sum
 } 

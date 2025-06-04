@@ -3,7 +3,7 @@ name = "nyx-compiler"
 version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
-description = "A compiler for the Nyx programming language"
+description = "Kotlin-like language compiler for Hades VM"
 license = "MIT"
 repository = "https://github.com/yourusername/nyx-compiler"
 
@@ -12,6 +12,11 @@ repository = "https://github.com/yourusername/nyx-compiler"
 thiserror = "1.0"  # For error handling
 log = "0.4"        # For logging
 env_logger = "0.10" # For logging setup
+vm = { path = "../vm" }
+hades-ir = { path = "../hades-ir" }
+logos = "0.14"
+chumsky = "0.9"
+indexmap = "2.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4"  # For better test assertions 

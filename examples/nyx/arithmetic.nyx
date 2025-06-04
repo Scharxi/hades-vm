@@ -1,22 +1,22 @@
-fn add(a: i32, b: i32) -> i32 {
-    a + b
+fun add(a: Int, b: Int): Int {
+    return a + b
 }
 
-fn sub(a: i32, b: i32) -> i32 {
-    a - b
+fun sub(a: Int, b: Int): Int {
+    return a - b
 }
 
-fn mul(a: i32, b: i32) -> i32 {
-    a * b
+fun mul(a: Int, b: Int): Int {
+    return a * b
 }
 
-fn div(a: i32, b: i32) -> i32 {
-    a / b
+fun div(a: Int, b: Int): Int {
+    return a / b
 }
 
-fn main() -> i32 {
-    let x = add(10, 5);
-    let y = sub(x, 3);
-    let z = mul(y, 2);
-    div(z, 3)
+fun main(): Int {
+    val x = add(10, 5)
+    val y = sub(x, 3)
+    val z = mul(y, 2)
+    return div(z, 3)
 } 

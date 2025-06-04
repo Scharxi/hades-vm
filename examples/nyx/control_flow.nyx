@@ -1,31 +1,31 @@
-fn is_positive(x: i32) -> i32 {
-    if x > 0 {
+fun isPositive(x: Int): Int {
+    return if (x > 0) {
         1
     } else {
         0
     }
 }
 
-fn factorial(n: i32) -> i32 {
-    if n <= 1 {
+fun factorial(n: Int): Int {
+    return if (n <= 1) {
         1
     } else {
         n * factorial(n - 1)
     }
 }
 
-fn fibonacci(n: i32) -> i32 {
-    if n <= 1 {
+fun fibonacci(n: Int): Int {
+    return if (n <= 1) {
         n
     } else {
         fibonacci(n - 1) + fibonacci(n - 2)
     }
 }
 
-fn main() -> i32 {
-    let a = is_positive(42);
-    let b = is_positive(-5);
-    let c = factorial(5);
-    let d = fibonacci(6);
-    a + b + c + d
+fun main(): Int {
+    val a = isPositive(42)
+    val b = isPositive(-5)
+    val c = factorial(5)
+    val d = fibonacci(6)
+    return a + b + c + d
 } 

@@ -1,0 +1,7 @@
+fun main(): Int {
+    val a = 10
+    val b = 5
+    val sum = a + b
+    val product = sum * 2
+    return product
+} 

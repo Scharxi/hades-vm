@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone)]
 pub struct TypeParameter {
     pub name: String,
@@ -76,9 +78,9 @@ pub struct Implementation {
     pub methods: Vec<Function>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Program {
-    pub items: Vec<Item>,
+    pub functions: Vec<Function>,
 }
 
 #[derive(Debug, Clone)]
@@ -90,151 +92,147 @@ pub enum Item {
     Implementation(Implementation),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
-    pub params: Vec<Parameter>,
-    pub return_type: Option<Type>,
+    pub parameters: Vec<Parameter>,
+    pub return_type: Type,
     pub body: Block,
-    pub is_async: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub name: String,
     pub type_: Type,
-    pub is_mutable: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    Let {
+    VariableDeclaration {
         name: String,
+        mutable: bool,
         type_: Option<Type>,
         initializer: Option<Expression>,
-        is_mutable: bool,
     },
-    Return(Option<Expression>),
+    Assignment {
+        name: String,
+        value: Expression,
+    },
     Expression(Expression),
+    Return(Option<Expression>),
     If {
         condition: Expression,
-        then_branch: Block,
-        else_branch: Option<Block>,
-    },
-    When {
-        subject: Expression,
-        arms: Vec<WhenArm>,
+        then_block: Block,
+        else_block: Option<Block>,
     },
     While {
         condition: Expression,
         body: Block,
     },
-    Assignment {
-        target: String,
-        value: Expression,
-    },
 }
 
-#[derive(Debug, Clone)]
-pub struct WhenArm {
-    pub pattern: Pattern,
-    pub guard: Option<Expression>,
-    pub body: Block,
-}
-
-#[derive(Debug, Clone)]
-pub enum Pattern {
-    Literal(Literal),
-    Identifier(String),
-    Constructor {
-        name: String,
-        fields: Vec<Pattern>,
-    },
-    Is(Type),
-    Wildcard,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Literal),
-    Variable(String),
+    Identifier(String),
     Binary {
         left: Box<Expression>,
-        operator: BinaryOp,
+        operator: BinaryOperator,
         right: Box<Expression>,
     },
     Unary {
-        operator: UnaryOp,
+        operator: UnaryOperator,
         operand: Box<Expression>,
     },
     Call {
-        function: Box<Expression>,
+        function: String,
         arguments: Vec<Expression>,
     },
-    MethodCall {
-        receiver: Box<Expression>,
-        method: String,
-        arguments: Vec<Expression>,
-    },
-    Field {
-        object: Box<Expression>,
-        field: String,
-    },
-    Block(Block),
     If {
         condition: Box<Expression>,
-        then_branch: Block,
-        else_branch: Option<Block>,
+        then_expr: Box<Expression>,
+        else_expr: Box<Expression>,
     },
-    When {
-        subject: Box<Expression>,
-        arms: Vec<WhenArm>,
-    },
-    Await(Box<Expression>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Integer(i64),
     Float(f64),
-    String(String),
     Boolean(bool),
+    String(String),
 }
 
-#[derive(Debug, Clone)]
-pub enum BinaryOp {
+#[derive(Debug, Clone, PartialEq)]
+pub enum BinaryOperator {
     Add,
-    Sub,
-    Mul,
-    Div,
-    Eq,
-    NotEq,
-    Lt,
-    LtEq,
-    Gt,
-    GtEq,
+    Subtract,
+    Multiply,
+    Divide,
+    Equal,
+    NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    And,
+    Or,
 }
 
-#[derive(Debug, Clone)]
-pub enum UnaryOp {
-    Neg,
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnaryOperator {
+    Minus,
     Not,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    Named {
-        name: String,
-        args: Vec<Type>,
-    },
-    Tuple(Vec<Type>),
-    Function {
-        params: Vec<Type>,
-        return_type: Box<Type>,
-    },
+    Int,
+    Float,
+    Bool,
+    String,
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Type::Int => write!(f, "Int"),
+            Type::Float => write!(f, "Float"),
+            Type::Bool => write!(f, "Bool"),
+            Type::String => write!(f, "String"),
+        }
+    }
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinaryOperator::Add => write!(f, "+"),
+            BinaryOperator::Subtract => write!(f, "-"),
+            BinaryOperator::Multiply => write!(f, "*"),
+            BinaryOperator::Divide => write!(f, "/"),
+            BinaryOperator::Equal => write!(f, "=="),
+            BinaryOperator::NotEqual => write!(f, "!="),
+            BinaryOperator::Less => write!(f, "<"),
+            BinaryOperator::LessEqual => write!(f, "<="),
+            BinaryOperator::Greater => write!(f, ">"),
+            BinaryOperator::GreaterEqual => write!(f, ">="),
+            BinaryOperator::And => write!(f, "&&"),
+            BinaryOperator::Or => write!(f, "||"),
+        }
+    }
+}
+
+impl fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnaryOperator::Minus => write!(f, "-"),
+            UnaryOperator::Not => write!(f, "!"),
+        }
+    }
 } 
