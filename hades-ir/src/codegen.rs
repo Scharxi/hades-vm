@@ -69,7 +69,7 @@ impl CodeGenContext {
     fn gen_constant(&mut self, value: &Value) -> Result<()> {
         let index = self.add_constant(value.clone());
         // Emit LOAD_CONST instruction with the constant pool index
-        self.emit(0x04); // LoadConstant opcode
+        self.emit(0x01); // LOAD_CONST opcode (was 0x04)
         self.emit_u32(index as u32);
         Ok(())
     }
@@ -83,7 +83,7 @@ impl CodeGenContext {
 
         // Emit the appropriate opcode for the operation
         let opcode = match op {
-            Operation::Add => 0x01, // Add opcode
+            Operation::Add => 0x10, // ADD opcode (was 0x01)
             Operation::Sub => 0x03, // Sub opcode
             Operation::Mul => 0x05, // Multiply opcode
             Operation::Div => 0x0A, // Divide opcode
@@ -107,8 +107,10 @@ impl CodeGenContext {
             
             Value::Argument { id, .. } => {
                 // Load argument from the appropriate slot
-                self.emit(0x0F); // LoadLocal opcode
-                self.emit_u32(id.raw() as u32);
+                self.emit(0x02); // LOAD_ARG opcode (was 0x0F)
+                // Emit 8-byte argument ID
+                let id_bytes = (id.raw() as u64).to_le_bytes();
+                self.emit_bytes(&id_bytes);
                 Ok(())
             },
             
@@ -134,7 +136,7 @@ impl CodeGenContext {
             Operation::Load => {
                 let ptr = &instruction.operands()[0];
                 self.gen_value(ptr)?;
-                self.emit(0x07); // LoadMemory opcode
+                self.emit(0x20); // LOAD opcode (was 0x07)
                 Ok(())
             },
             
@@ -143,7 +145,7 @@ impl CodeGenContext {
                 let ptr = &instruction.operands()[1];
                 self.gen_value(value)?;
                 self.gen_value(ptr)?;
-                self.emit(0x08); // StoreMemory opcode
+                self.emit(0x21); // STORE opcode (was 0x08)
                 Ok(())
             },
             
@@ -151,7 +153,7 @@ impl CodeGenContext {
                 if let Some(value) = instruction.operands().first() {
                     self.gen_value(value)?;
                 }
-                self.emit(0x0E); // Return opcode
+                self.emit(0xFF); // RET opcode (was 0x0E)
                 Ok(())
             },
             
@@ -178,7 +180,7 @@ impl CodeGenContext {
     /// Generate code for a function
     pub fn gen_function(&mut self, function: &Function) -> Result<()> {
         // Generate prologue
-        self.emit(0x0D); // Call opcode (used for function entry)
+        self.emit(0x00); // ENTER opcode (was 0x0D)
         self.emit_u32(function.parameters().len() as u32);
 
         // Generate code for each basic block
