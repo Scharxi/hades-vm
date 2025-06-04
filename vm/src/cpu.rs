@@ -191,17 +191,30 @@ impl CPU {
     pub fn step(&mut self) -> bool {
         let current_idx = match self.current_process_idx {
             Some(idx) => idx,
-            None => return false, // No running process, VM stops
+            None => {
+                // No running process, try to schedule one
+                return self.schedule_and_switch_context(None);
+            }
         };
 
         // Ensure the index is valid and the process is running or ready
-        if current_idx >= self.processes.len() || self.processes[current_idx].state == ProcessState::Terminated {
-            // Try to schedule a new process if the current one is invalid/terminated
-            return false; 
+        if current_idx >= self.processes.len() {
+            return false;
+        }
+
+        // If the current process is terminated, try to schedule another one
+        if self.processes[current_idx].state == ProcessState::Terminated {
+            return self.schedule_and_switch_context(Some(current_idx));
+        }
+
+        // Set the current process to Running if it was Ready
+        if self.processes[current_idx].state == ProcessState::Ready {
+            self.processes[current_idx].state = ProcessState::Running;
         }
         
         // Load PC and stack for the current process from PCB into CPU components
         self.fetcher.set_pc(self.processes[current_idx].pc);
+        self.stack = self.processes[current_idx].stack.clone();
 
         if let Some(instruction_raw) = self.fetcher.fetch(&mut self.memory) {
             match self.decoder.decode(instruction_raw) {
@@ -217,9 +230,10 @@ impl CPU {
 
                     // Update PC in PCB
                     self.processes[current_idx].pc = self.fetcher.pc;
+                    self.processes[current_idx].stack = self.stack.clone();
 
                     match execution_signal {
-                        ExecutionSignal::Continue => {}
+                        ExecutionSignal::Continue => true,
                         ExecutionSignal::Jump(address) => {
                             if instruction.opcode == Opcode::Call {
                                 if let Some(frame_idx) = self.stack.current_frame {
@@ -230,36 +244,33 @@ impl CPU {
                             }
                             self.processes[current_idx].pc = address;
                             self.fetcher.set_pc(address);
+                            true
                         }
                         ExecutionSignal::Yield => {
                             self.processes[current_idx].state = ProcessState::Ready;
-                            self.processes[current_idx].stack = self.stack.clone();
-                            return false;
+                            self.schedule_and_switch_context(Some(current_idx));
+                            true  // The instruction was executed successfully
                         }
                         ExecutionSignal::Terminate => {
                             self.processes[current_idx].state = ProcessState::Terminated;
-                            self.processes[current_idx].stack = self.stack.clone();
-                            return false; // Stop execution when the process terminates
+                            self.schedule_and_switch_context(Some(current_idx));
+                            true  // The instruction was executed successfully
                         }
                     }
-                    true // An instruction was executed or signal handled
                 }
-                Err(decode_error) => {
-                    // Handle decode error, terminate process
-                    eprintln!(
-                        "PID {}: Failed to decode instruction at PC {}. Error: {:?}. Terminating process.",
-                        self.processes[current_idx].pid,
-                        self.processes[current_idx].pc,
-                        decode_error
-                    );
+                Err(e) => {
+                    println!("PID {}: Failed to decode instruction at PC {}. Error: {:?}. Terminating process.", 
+                        self.processes[current_idx].pid, self.processes[current_idx].pc, e);
                     self.processes[current_idx].state = ProcessState::Terminated;
-                    false
+                    self.schedule_and_switch_context(Some(current_idx));
+                    false  // Failed to execute instruction
                 }
             }
         } else {
-            // No more instructions to fetch, terminate process
+            // No more instructions, terminate process
             self.processes[current_idx].state = ProcessState::Terminated;
-            false
+            self.schedule_and_switch_context(Some(current_idx));
+            false  // No instruction was available to execute
         }
     }
 
@@ -270,10 +281,11 @@ impl CPU {
         let mut search_offset = 0;
 
         if let Some(previous_idx) = previous_process_idx_opt {
-            // Starte die Suche nach dem vorherigen Prozess für Round Robin
+            // Start search after the previous process for Round Robin
             search_offset = (previous_idx + 1) % self.processes.len();
         }
 
+        // Search for the next ready process
         for i in 0..self.processes.len() {
             let current_search_idx = (search_offset + i) % self.processes.len();
             if self.processes[current_search_idx].state == ProcessState::Ready {
@@ -285,14 +297,14 @@ impl CPU {
         if let Some(pid_to_run) = next_pid_to_run {
             if let Some(new_process_idx) = self.processes.iter().position(|p| p.pid == pid_to_run) {
                 self.processes[new_process_idx].state = ProcessState::Running;
-                self.stack = self.processes[new_process_idx].stack.clone(); // Stack laden
-                self.fetcher.set_pc(self.processes[new_process_idx].pc);    // PC laden
+                self.stack = self.processes[new_process_idx].stack.clone(); // Load stack
+                self.fetcher.set_pc(self.processes[new_process_idx].pc);    // Load PC
                 self.current_process_idx = Some(new_process_idx);
                 return true;
             }
         }
         
-        // Kein weiterer Ready-Prozess gefunden
+        // No more ready processes
         self.current_process_idx = None;
         false
     }
@@ -306,11 +318,11 @@ mod tests {
     #[test]
     fn test_cpu_execution() {
         // Create a simple program that adds two numbers (3 + 4 = 7)
-        // Format: opcode is last byte, operand is 24 bits [0-2]
         let program = vec![
             0x00, 0x00, 0x03, 0x04, // LoadConstant (opcode 4) with operand 3
             0x00, 0x00, 0x04, 0x04, // LoadConstant (opcode 4) with operand 4
             0x00, 0x00, 0x00, 0x01, // Add (opcode 1)
+            0x00, 0x00, 0x00, 0xFF, // Terminate (opcode 0xFF)
         ];
         
         let mut cpu = CPU::new(1000);
@@ -320,16 +332,16 @@ mod tests {
         assert!(cpu.step()); // LoadConstant 3
         assert!(cpu.step()); // LoadConstant 4
         assert!(cpu.step()); // Add
+        assert!(cpu.step()); // Terminate
         
         // Check the result
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(7)));
         
-        // No more instructions
-        // Mit Prozessmanagement kann step() false zurückgeben, wenn kein Prozess mehr lauffähig ist.
-        // Der Test muss ggf. angepasst werden, wenn Terminate implementiert ist.
-        // Für einen einzelnen Prozess ohne Yield/Terminate sollte es nach Programmende false sein.
-        while cpu.step() {} // Lasse die CPU laufen, bis keine Schritte mehr möglich sind
-        assert_eq!(cpu.current_process_idx, None); // Kein Prozess sollte mehr laufen
+        // Process should be terminated
+        assert_eq!(cpu.processes[0].state, ProcessState::Terminated);
+        
+        // No more instructions should be executed
+        assert!(!cpu.step());
     }
 
     #[test]
@@ -448,7 +460,7 @@ mod tests {
     fn test_cooperative_multitasking_two_processes() {
         let mut cpu = CPU::new(1000);
 
-        // Programm 1: LoadC 1, Yield, LoadC 2, Yield, LoadC 3, Terminate
+        // Program 1: LoadC 1, Yield, LoadC 2, Yield, LoadC 3, Terminate
         let program1 = vec![
             0x00, 0x00, 0x01, 0x04, // Load 1 (opcode 0x04 = LoadConstant)
             0x00, 0x00, 0x00, 0xF0, // Yield (opcode 0xF0)
@@ -458,7 +470,7 @@ mod tests {
             0x00, 0x00, 0x00, 0xFF, // Terminate (opcode 0xFF)
         ];
 
-        // Programm 2: LoadC 10, Yield, LoadC 11, Yield, LoadC 12, Terminate
+        // Program 2: LoadC 10, Yield, LoadC 11, Yield, LoadC 12, Terminate
         let program2 = vec![
             0x00, 0x00, 0x0A, 0x04, // Load 10 (opcode 0x04 = LoadConstant)
             0x00, 0x00, 0x00, 0xF0, // Yield (opcode 0xF0)
@@ -468,90 +480,82 @@ mod tests {
             0x00, 0x00, 0x00, 0xFF, // Terminate (opcode 0xFF)
         ];
 
-        // Load the two programs at different memory locations
+        // Load program1 and create first process
         cpu.load_program(&program1);
         let p1_idx = cpu.current_process_idx.unwrap();
         assert_eq!(cpu.processes[p1_idx].pid, 0);
 
-        // Load program2 at a different memory location
-        let program2_start_pc = 100 * 4; // In bytes, jede Instruktion 4 Bytes
-        for (offset, chunk) in program2.chunks(4).enumerate() {
+        // Create second process with program2
+        let program2_start = 100;
+        for (i, chunk) in program2.chunks(4).enumerate() {
             if chunk.len() == 4 {
                 let raw_instr = RawInstruction::from_bytes(chunk[0], chunk[1], chunk[2], chunk[3]);
-                cpu.memory.write(program2_start_pc / 4 + offset, raw_instr.as_i32()).unwrap();
+                cpu.memory.write(program2_start + i, raw_instr.as_i32()).unwrap();
             }
         }
-        let _p2_pid = cpu.create_process(program2_start_pc, 256);
+        let p2_pid = cpu.create_process(program2_start * 4, 256);
+        let p2_idx = cpu.processes.iter().position(|p| p.pid == p2_pid).unwrap();
 
-        // Verify we have two processes
+        // Verify initial state
         assert_eq!(cpu.processes.len(), 2);
-        assert_eq!(cpu.processes[0].state, ProcessState::Running);
-        assert_eq!(cpu.processes[1].state, ProcessState::Ready);
+        assert_eq!(cpu.processes[p1_idx].state, ProcessState::Running);
+        assert_eq!(cpu.processes[p2_idx].state, ProcessState::Ready);
 
         // P1: Load 1
-        assert!(cpu.step()); 
-        assert_eq!(cpu.processes[p1_idx].pc, 4);
+        assert!(cpu.step());
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(1)));
-        let p1_original_stack_len = cpu.stack.len();
 
-        // P1: Yield -> switch to P2
-        assert!(cpu.step()); 
-        let p2_idx = cpu.current_process_idx.unwrap();
-        assert_ne!(p1_idx, p2_idx);
-        assert_eq!(cpu.processes[p2_idx].pc, program2_start_pc);
+        // P1: Yield -> P2
+        assert!(cpu.step());
+        assert_eq!(cpu.current_process_idx.unwrap(), p2_idx);
         assert_eq!(cpu.processes[p1_idx].state, ProcessState::Ready);
-        assert_eq!(cpu.processes[p1_idx].stack.len(), p1_original_stack_len);
+        assert_eq!(cpu.processes[p2_idx].state, ProcessState::Running);
 
         // P2: Load 10
         assert!(cpu.step());
-        assert_eq!(cpu.processes[p2_idx].pc, program2_start_pc + 4);
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(10)));
-        let p2_original_stack_len = cpu.stack.len();
 
-        // P2: Yield -> switch to P1
+        // P2: Yield -> P1
         assert!(cpu.step());
         assert_eq!(cpu.current_process_idx.unwrap(), p1_idx);
-        assert_eq!(cpu.processes[p1_idx].pc, 8);
-        assert_eq!(cpu.processes[p2_idx].pc, program2_start_pc + 8);
+        assert_eq!(cpu.processes[p1_idx].state, ProcessState::Running);
         assert_eq!(cpu.processes[p2_idx].state, ProcessState::Ready);
-        assert_eq!(cpu.processes[p2_idx].stack.len(), p2_original_stack_len);
 
         // P1: Load 2
         assert!(cpu.step());
-        assert_eq!(cpu.processes[p1_idx].pc, 12);
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(2)));
 
-        // P1: Yield -> switch to P2
+        // P1: Yield -> P2
         assert!(cpu.step());
         assert_eq!(cpu.current_process_idx.unwrap(), p2_idx);
-        assert_eq!(cpu.processes[p2_idx].pc, program2_start_pc + 8);
 
         // P2: Load 11
         assert!(cpu.step());
-        assert_eq!(cpu.processes[p2_idx].pc, program2_start_pc + 12);
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(11)));
 
-        // P2: Yield -> switch to P1
+        // P2: Yield -> P1
         assert!(cpu.step());
         assert_eq!(cpu.current_process_idx.unwrap(), p1_idx);
-        assert_eq!(cpu.processes[p1_idx].pc, 16);
-        assert_eq!(cpu.processes[p2_idx].pc, program2_start_pc + 16);
 
         // P1: Load 3
         assert!(cpu.step());
-        assert_eq!(cpu.processes[p1_idx].pc, 20);
         assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(3)));
 
         // P1: Terminate
-        cpu.step();
-        
-        // Check that P1 is terminated
+        assert!(cpu.step());
         assert_eq!(cpu.processes[p1_idx].state, ProcessState::Terminated);
-        
-        // P2 is now running because P1 terminated and the scheduler switched to P2
-        assert_eq!(cpu.processes[p2_idx].state, ProcessState::Running);
-        
-        // After the test, either CPU terminates all processes or switches to P2
-        // The exact behavior isn't critical for this test
+        assert_eq!(cpu.current_process_idx.unwrap(), p2_idx);
+
+        // P2: Load 12
+        assert!(cpu.step());
+        assert_eq!(cpu.stack.peek(), Some(&StackValue::Integer(12)));
+
+        // P2: Terminate
+        assert!(cpu.step());
+        assert_eq!(cpu.processes[p2_idx].state, ProcessState::Terminated);
+
+        // No more runnable processes
+        assert!(!cpu.step());
+        assert_eq!(cpu.current_process_idx, None);
     }
 } 

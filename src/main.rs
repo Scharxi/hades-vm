@@ -8,7 +8,7 @@ fn main() {
     println!("========================\n");
     
     // Create a new virtual machine
-    let mut vm = VirtualMachine::new();
+    let mut vm = VirtualMachine::new(false);
     
     // Program to calculate Fibonacci sequence directly
     let program = [

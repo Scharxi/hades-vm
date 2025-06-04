@@ -1108,11 +1108,12 @@ impl SegmentedMemory {
     pub fn create_standard_layout(memory_size: usize) -> Result<Self, String> {
         let mut memory = Self::new(memory_size);
 
-        // Calculate region sizes (simplified for development)
-        let code_size = memory_size / 4;
-        let data_size = memory_size / 4;
-        let stack_size = memory_size / 4;
-        let heap_size = memory_size / 4;
+        // Calculate region sizes based on documentation percentages
+        let code_size = memory_size * 20 / 100;
+        let constants_size = memory_size * 10 / 100;
+        let data_size = memory_size * 20 / 100;
+        let stack_size = memory_size * 25 / 100;
+        let heap_size = memory_size * 25 / 100;
 
         // Define regions with appropriate permissions
         let code_region = MemoryRegion::new(
@@ -1127,9 +1128,17 @@ impl SegmentedMemory {
             Some("Code Region".to_string()),
         );
 
+        let constants_region = MemoryRegion::new(
+            MemoryRegionType::Constants,
+            code_size,
+            constants_size,
+            vec![AccessPermission::Read],
+            Some("Constants Region".to_string()),
+        );
+
         let data_region = MemoryRegion::new(
             MemoryRegionType::Data,
-            code_size,
+            code_size + constants_size,
             data_size,
             vec![AccessPermission::Read, AccessPermission::Write],
             Some("Data Region".to_string()),
@@ -1137,7 +1146,7 @@ impl SegmentedMemory {
 
         let stack_region = MemoryRegion::new(
             MemoryRegionType::Stack,
-            code_size + data_size,
+            code_size + constants_size + data_size,
             stack_size,
             vec![AccessPermission::Read, AccessPermission::Write],
             Some("Stack Region".to_string()),
@@ -1145,7 +1154,7 @@ impl SegmentedMemory {
 
         let heap_region = MemoryRegion::new(
             MemoryRegionType::Heap,
-            code_size + data_size + stack_size,
+            code_size + constants_size + data_size + stack_size,
             heap_size,
             vec![AccessPermission::Read, AccessPermission::Write],
             Some("Heap Region".to_string()),
@@ -1153,6 +1162,7 @@ impl SegmentedMemory {
 
         // Add regions to memory
         memory.define_region(code_region)?;
+        memory.define_region(constants_region)?;
         memory.define_region(data_region)?;
         memory.define_region(stack_region)?;
         memory.define_region(heap_region)?;

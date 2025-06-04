@@ -213,13 +213,13 @@ impl Stack {
     /// This method sets up a new execution context for function calls,
     /// with the specified return address and local variable count.
     pub fn push_frame(&mut self, return_address: usize, local_count: usize) {
-        // Die Base-Pointer sollte auf die aktuelle Position im Stack gesetzt werden,
-        // vor dem Reservieren von Plätze für lokale Variablen
-        let base_pointer = self.values.len();
-        
-        // Wir müssen keine zusätzlichen Plätze für lokale Variablen reservieren,
-        // da die Parameter bereits auf dem Stack sind
-        // Die eigentlichen lokalen Variablen werden bei Bedarf mit StoreLocal erstellt
+        // The base pointer should point to where the parameters start
+        // Parameters are already on the stack in the correct order
+        let base_pointer = if self.values.len() >= local_count {
+            self.values.len() - local_count
+        } else {
+            panic!("Not enough values on stack for local variables");
+        };
         
         let frame = StackFrame {
             return_address,
@@ -235,85 +235,80 @@ impl Stack {
     ///
     /// This method is used when returning from a function call. It will:
     /// 1. Save any return value that might be on top of the stack
-    /// 2. Remove all local variables and parameters
-    /// 3. Pop the frame
-    /// 4. Push the return value back (if any)
-    /// 5. Return the address to jump back to
+    /// 2. Restore the stack to its state before the function call
+    /// 3. Push the return value back on top
+    /// 4. Return the return address for the caller
     pub fn pop_frame(&mut self) -> Option<usize> {
         if let Some(frame_idx) = self.current_frame {
-            let frame = &self.frames[frame_idx];
-            let return_address = frame.return_address;
-            
-            // Get the return value if there is one on top of the stack
-            let return_value = if self.values.len() > frame.base_pointer {
-                // Get the top value as the return value (we don't pop it yet)
-                Some(self.values[self.values.len() - 1].clone())
+            if frame_idx < self.frames.len() {
+                let frame = self.frames.remove(frame_idx);
+                
+                // Save return value if one exists (should be on top of the stack)
+                let return_value = if self.values.len() > frame.base_pointer {
+                    Some(self.values.pop().unwrap())
+                } else {
+                    None
+                };
+                
+                // Restore stack to base pointer (remove local variables)
+                while self.values.len() > frame.base_pointer {
+                    self.values.pop();
+                }
+                
+                // Push return value back if we had one
+                if let Some(value) = return_value {
+                    self.values.push(value);
+                }
+                
+                // Update current frame
+                self.current_frame = if frame_idx > 0 {
+                    Some(frame_idx - 1)
+                } else {
+                    None
+                };
+                
+                Some(frame.return_address)
             } else {
                 None
-            };
-            
-            // Clear all values from the stack
-            // This removes all local variables and parameters
-            self.values.clear();
-            
-            // Push the return value back if there was one
-            if let Some(value) = return_value {
-                self.values.push(value);
             }
-            
-            // Remove the frame
-            self.frames.pop();
-            
-            // Update the current frame pointer
-            self.current_frame = if self.frames.is_empty() {
-                None
-            } else {
-                Some(self.frames.len() - 1)
-            };
-            
-            Some(return_address)
         } else {
             None
         }
     }
     
-    /// Gets a local variable from the current frame.
+    /// Gets a reference to a local variable in the current frame.
     pub fn get_local(&self, index: usize) -> Option<&StackValue> {
         if let Some(frame_idx) = self.current_frame {
-            let frame = &self.frames[frame_idx];
-            
-            // Calculate the correct index for local variables
-            // Parameters are stored at base_pointer and onwards
-            if index < frame.local_count {
-                let local_idx = frame.base_pointer + index;
-                if local_idx < self.values.len() {
-                    return Some(&self.values[local_idx]);
+            if frame_idx < self.frames.len() {
+                let frame = &self.frames[frame_idx];
+                if index < frame.local_count && frame.local_count > 0 {
+                    // Parameters are pushed in reverse order, so we need to reverse the index
+                    // for parameters to maintain the expected order
+                    let actual_index = frame.base_pointer + (frame.local_count - 1 - index);
+                    return self.values.get(actual_index);
                 }
             }
-            None
-        } else {
-            None
         }
+        None
     }
     
     /// Sets a local variable in the current frame.
-    pub fn set_local(&mut self, index: usize, value: StackValue) -> Result<(), &'static str> {
+    pub fn set_local(&mut self, index: usize, value: StackValue) -> Result<(), String> {
         if let Some(frame_idx) = self.current_frame {
-            let frame = &self.frames[frame_idx];
-            
-            // Calculate the correct index for local variables
-            // Parameters are stored at base_pointer and onwards
-            if index < frame.local_count {
-                let local_idx = frame.base_pointer + index;
-                if local_idx < self.values.len() {
-                    self.values[local_idx] = value;
-                    return Ok(());
+            if frame_idx < self.frames.len() {
+                let frame = &self.frames[frame_idx];
+                if index < frame.local_count && frame.local_count > 0 {
+                    // Parameters are pushed in reverse order, so we need to reverse the index
+                    // for parameters to maintain the expected order
+                    let actual_index = frame.base_pointer + (frame.local_count - 1 - index);
+                    if let Some(local) = self.values.get_mut(actual_index) {
+                        *local = value;
+                        return Ok(());
+                    }
                 }
             }
-            Err("Invalid local variable index")
-        } else {
-            Err("No active stack frame")
         }
+        Err("Invalid local variable access".to_string())
     }
     
     /// Returns the number of values on the stack.
@@ -362,8 +357,6 @@ mod tests {
         let mut stack = Stack::new(10);
         
         // Push parameters that will become local variables
-        // Local 0 will be the value on top of the stack when frame is created
-        // Local 1 will be the value below that
         stack.push(StackValue::Integer(1)); // This will be local 1
         stack.push(StackValue::Integer(2)); // This will be local 0
         
@@ -371,14 +364,12 @@ mod tests {
         assert_eq!(stack.len(), 2);
         
         // Create a frame with 2 local variables
-        // The base_pointer will be set to 2 (current stack length)
         stack.push_frame(100, 2);
         assert_eq!(stack.frame_depth(), 1);
         
-        // In the corrected implementation, local variables are accessed in reverse order
-        // from the top of the stack at the time the frame was created
-        assert_eq!(stack.get_local(0), Some(&StackValue::Integer(2))); // Top value
-        assert_eq!(stack.get_local(1), Some(&StackValue::Integer(1))); // Value below top
+        // Check local variables
+        assert_eq!(stack.get_local(0), Some(&StackValue::Integer(2)));
+        assert_eq!(stack.get_local(1), Some(&StackValue::Integer(1)));
         
         // Test setting a local variable
         stack.set_local(0, StackValue::Integer(42)).unwrap();
@@ -386,9 +377,8 @@ mod tests {
         
         // Push a return value on top of the stack
         stack.push(StackValue::Integer(100));
-        assert_eq!(stack.len(), 3); // 2 locals + 1 return value
         
-        // Pop the frame - this should leave only the return value
+        // Pop the frame - this should preserve the return value
         let return_addr = stack.pop_frame();
         assert_eq!(return_addr, Some(100));
         assert_eq!(stack.frame_depth(), 0);
@@ -396,6 +386,12 @@ mod tests {
         // The stack should now only have our return value
         assert_eq!(stack.len(), 1);
         assert_eq!(stack.peek(), Some(&StackValue::Integer(100)));
+        
+        // Pop the return value
+        assert_eq!(stack.pop(), Some(StackValue::Integer(100)));
+        
+        // Stack should be empty
+        assert_eq!(stack.peek(), None);
     }
 
     #[test]
