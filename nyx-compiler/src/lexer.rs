@@ -37,6 +37,32 @@ pub enum Token {
     #[token("as")]
     As,
 
+    // Class system keywords
+    #[token("class")]
+    Class,
+    #[token("constructor")]
+    Constructor,
+    #[token("init")]
+    Init,
+    #[token("this")]
+    This,
+    #[token("open")]
+    Open,
+    #[token("abstract")]
+    Abstract,
+    #[token("override")]
+    Override,
+    #[token("final")]
+    Final,
+    #[token("data")]
+    Data,
+    #[token("sealed")]
+    Sealed,
+    #[token("extends")]
+    Extends,
+    #[token("implements")]
+    Implements,
+
     // Visibility keywords
     #[token("internal")]
     Internal,
@@ -120,6 +146,8 @@ pub enum Token {
     Colon,
     #[token(".")]
     Dot,
+    #[token("::")]
+    DoubleColon,
 
     // Literals and identifiers
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
@@ -163,6 +191,18 @@ impl fmt::Display for Token {
             Token::Pub => write!(f, "pub"),
             Token::From => write!(f, "from"),
             Token::As => write!(f, "as"),
+            Token::Class => write!(f, "class"),
+            Token::Constructor => write!(f, "constructor"),
+            Token::Init => write!(f, "init"),
+            Token::This => write!(f, "this"),
+            Token::Open => write!(f, "open"),
+            Token::Abstract => write!(f, "abstract"),
+            Token::Override => write!(f, "override"),
+            Token::Final => write!(f, "final"),
+            Token::Data => write!(f, "data"),
+            Token::Sealed => write!(f, "sealed"),
+            Token::Extends => write!(f, "extends"),
+            Token::Implements => write!(f, "implements"),
             Token::Int => write!(f, "Int"),
             Token::Float => write!(f, "Float"),
             Token::Bool => write!(f, "Bool"),
@@ -193,6 +233,7 @@ impl fmt::Display for Token {
             Token::Comma => write!(f, ","),
             Token::Colon => write!(f, ":"),
             Token::Dot => write!(f, "."),
+            Token::DoubleColon => write!(f, "::"),
             Token::Identifier(name) => write!(f, "{}", name),
             Token::IntegerLiteral(value) => write!(f, "{}", value),
             Token::FloatLiteral(value) => write!(f, "{}", value),
@@ -280,5 +321,29 @@ mod tests {
             Token::Multiply,
             Token::Identifier("c".to_string()),
         ]);
+    }
+
+    #[test]
+    fn test_class_tokens() {
+        let input = "class Person constructor init this open abstract override final data sealed extends implements";
+        let tokens = tokenize(input);
+        
+        let expected = vec![
+            Token::Class,
+            Token::Identifier("Person".to_string()),
+            Token::Constructor,
+            Token::Init,
+            Token::This,
+            Token::Open,
+            Token::Abstract,
+            Token::Override,
+            Token::Final,
+            Token::Data,
+            Token::Sealed,
+            Token::Extends,
+            Token::Implements,
+        ];
+        
+        assert_eq!(tokens, expected);
     }
 } 

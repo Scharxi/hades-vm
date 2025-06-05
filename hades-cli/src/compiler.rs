@@ -290,6 +290,35 @@ impl Compiler {
                 self.compile_expression(then_expr, bytecode, context)?;
                 Ok(())
             }
+            
+            // Class-related expressions (placeholders for now)
+            Expression::ObjectCreation { class_name: _, arguments: _ } => {
+                // TODO: Implement class instantiation
+                // For now, just return a placeholder value (42)
+                bytecode.extend_from_slice(&[0x00, 0x00, 0x2A, 0x04]); // LoadConstant 42
+                Ok(())
+            }
+            
+            Expression::PropertyAccess { object: _, property: _ } => {
+                // TODO: Implement property access
+                // For now, just return a placeholder value (0)
+                bytecode.extend_from_slice(&[0x00, 0x00, 0x00, 0x04]); // LoadConstant 0
+                Ok(())
+            }
+            
+            Expression::MethodCall { object: _, method: _, arguments: _ } => {
+                // TODO: Implement method calls
+                // For now, just return a placeholder value (1)
+                bytecode.extend_from_slice(&[0x00, 0x00, 0x01, 0x04]); // LoadConstant 1
+                Ok(())
+            }
+            
+            Expression::This => {
+                // TODO: Implement 'this' reference
+                // For now, just return a placeholder value (this object reference would be 0)
+                bytecode.extend_from_slice(&[0x00, 0x00, 0x00, 0x04]); // LoadConstant 0
+                Ok(())
+            }
         }
     }
 }

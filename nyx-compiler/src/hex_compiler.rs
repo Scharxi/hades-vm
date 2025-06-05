@@ -300,6 +300,27 @@ impl HexCompiler {
                 // For simplicity, just return the then value
                 Ok(then_val)
             }
+            
+            // Class-related expressions (placeholders for now)
+            Expression::ObjectCreation { class_name: _, arguments: _ } => {
+                // TODO: Implement class instantiation
+                Ok(IRValue::integer_constant(0, IRType::pointer(IRType::void())))
+            }
+            
+            Expression::PropertyAccess { object: _, property: _ } => {
+                // TODO: Implement property access
+                Ok(IRValue::integer_constant(0, IRType::i32()))
+            }
+            
+            Expression::MethodCall { object: _, method: _, arguments: _ } => {
+                // TODO: Implement method calls
+                Ok(IRValue::integer_constant(0, IRType::i32()))
+            }
+            
+            Expression::This => {
+                // TODO: Implement 'this' reference
+                Ok(IRValue::integer_constant(0, IRType::pointer(IRType::void())))
+            }
         }
     }
 
@@ -319,6 +340,8 @@ impl HexCompiler {
             Type::Bool => IRType::boolean(),
             Type::String => IRType::string(),
             Type::Void => IRType::void(),
+            Type::Class(_) => IRType::pointer(IRType::void()), // Placeholder for class types
+            Type::Generic { .. } => IRType::pointer(IRType::void()), // Placeholder for generic types
         }
     }
 }

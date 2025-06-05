@@ -12,6 +12,7 @@ pub mod codegen;
 pub mod hex_compiler;
 pub mod visibility_tests;
 pub mod nested_module_tests;
+pub mod class_tests;
 
 /// Re-export commonly used types
 pub use lexer::{Lexer, Token};

@@ -55,18 +55,28 @@ impl Parser {
                 }
                 // Check for module declarations with any visibility modifier
                 Token::Mod | Token::Pub | Token::Internal | Token::Protected | Token::Package => {
-                    // Look ahead to see if this is a module or function declaration
+                    // Look ahead to see if this is a module, class, or function declaration
                     if self.is_module_declaration() {
                         modules.push(self.parse_module_declaration()?);
+                    } else if self.is_class_declaration() {
+                        return Err(self.error("Class declarations are not yet fully supported in module-aware programs"));
                     } else {
                         functions.push(self.parse_function()?);
+                    }
+                }
+                // Class-related tokens should be handled separately
+                Token::Class | Token::Open | Token::Abstract | Token::Final | Token::Data | Token::Sealed => {
+                    if self.is_class_declaration() {
+                        return Err(self.error("Class declarations are not yet fully supported in module-aware programs"));
+                    } else {
+                        return Err(self.error("Unexpected class modifier without 'class' keyword"));
                     }
                 }
                 Token::Fun => {
                     functions.push(self.parse_function()?);
                 }
                 _ => {
-                    return Err(self.error("Expected import, module, or function declaration"));
+                    return Err(self.error("Expected import, module, class, or function declaration"));
                 }
             }
         }
@@ -137,6 +147,27 @@ impl Parser {
             Token::Bool => Ok(Type::Bool),
             Token::String => Ok(Type::String),
             Token::Void => Ok(Type::Void),
+            Token::Identifier(class_name) => {
+                // Check for generic type parameters
+                if self.check(&Token::Less) {
+                    self.advance(); // consume '<'
+                    let mut type_params = Vec::new();
+                    
+                    if !self.check(&Token::Greater) {
+                        loop {
+                            type_params.push(self.parse_type()?);
+                            if !self.match_token(&Token::Comma) {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    self.consume(Token::Greater, "Expected '>' after type parameters")?;
+                    Ok(Type::Generic { name: class_name, type_params })
+                } else {
+                    Ok(Type::Class(class_name))
+                }
+            }
             _ => Err(self.error("Expected type")),
         }
     }
@@ -371,22 +402,51 @@ impl Parser {
                 self.advance(); // consume '.'
                 
                 // Allow both identifiers and 'super' after a dot
-                let next_name = if self.check(&Token::Super) {
+                let property_name = if self.check(&Token::Super) {
                     self.advance();
                     "super".to_string()
                 } else {
                     self.consume_identifier("Expected identifier or 'super' after '.'")?
                 };
                 
-                // Build qualified name by combining current expression with next part
-                let qualified_name = match expr {
-                    Expression::Identifier(name) => format!("{}.{}", name, next_name),
-                    _ => return Err(self.error("Invalid qualified expression")),
-                };
-                
-                expr = Expression::Identifier(qualified_name);
+                // Check if this is a method call (property access followed by arguments)
+                if self.check(&Token::LeftParen) {
+                    self.advance(); // consume '('
+                    
+                    let mut arguments = Vec::new();
+                    if !self.check(&Token::RightParen) {
+                        loop {
+                            arguments.push(self.parse_expression()?);
+                            if !self.match_token(&Token::Comma) {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    self.consume(Token::RightParen, "Expected ')' after arguments")?;
+                    
+                    expr = Expression::MethodCall {
+                        object: Box::new(expr),
+                        method: property_name,
+                        arguments,
+                    };
+                } else {
+                    // Build qualified name for module access or property access for objects
+                    match expr {
+                        Expression::Identifier(name) => {
+                            expr = Expression::Identifier(format!("{}.{}", name, property_name));
+                        }
+                        _ => {
+                            // Property access on object expressions
+                            expr = Expression::PropertyAccess {
+                                object: Box::new(expr),
+                                property: property_name,
+                            };
+                        }
+                    }
+                }
             } else if self.check(&Token::LeftParen) && matches!(expr, Expression::Identifier(_)) {
-                // Function call
+                // Function call or class instantiation
                 self.advance(); // consume '('
                 
                 let mut arguments = Vec::new();
@@ -402,10 +462,18 @@ impl Parser {
                 self.consume(Token::RightParen, "Expected ')' after arguments")?;
                 
                 if let Expression::Identifier(function_name) = expr {
-                    expr = Expression::Call {
-                        function: function_name,
-                        arguments,
-                    };
+                    // Check if this looks like a class name (starts with uppercase)
+                    if function_name.chars().next().map_or(false, |c| c.is_uppercase()) {
+                        expr = Expression::ObjectCreation {
+                            class_name: function_name,
+                            arguments,
+                        };
+                    } else {
+                        expr = Expression::Call {
+                            function: function_name,
+                            arguments,
+                        };
+                    }
                 }
                 break;
             } else {
@@ -425,6 +493,7 @@ impl Parser {
             Token::StringLiteral(value) => Ok(Expression::Literal(Literal::String(value))),
             Token::Identifier(name) => Ok(Expression::Identifier(name)),
             Token::Super => Ok(Expression::Identifier("super".to_string())),
+            Token::This => Ok(Expression::This),
             Token::LeftParen => {
                 let expr = self.parse_expression()?;
                 self.consume(Token::RightParen, "Expected ')' after expression")?;
@@ -584,6 +653,50 @@ impl Parser {
         false // End of tokens without finding 'mod' or 'fun'
     }
 
+    /// This looks ahead to distinguish between class and function declarations
+    /// when they both start with visibility modifiers
+    fn is_class_declaration(&self) -> bool {
+        let mut pos = self.current;
+        
+        // Skip past visibility modifiers
+        while pos < self.tokens.len() {
+            match &self.tokens[pos] {
+                Token::Pub => {
+                    pos += 1;
+                    // Handle pub(restriction) syntax
+                    if pos < self.tokens.len() && matches!(self.tokens[pos], Token::LeftParen) {
+                        pos += 1; // skip '('
+                        // Skip the restriction content
+                        while pos < self.tokens.len() && !matches!(self.tokens[pos], Token::RightParen) {
+                            pos += 1;
+                        }
+                        if pos < self.tokens.len() && matches!(self.tokens[pos], Token::RightParen) {
+                            pos += 1; // skip ')'
+                        }
+                    }
+                }
+                Token::Internal | Token::Protected | Token::Package => {
+                    pos += 1;
+                }
+                // Skip class modifiers
+                Token::Open | Token::Abstract | Token::Final | Token::Data | Token::Sealed => {
+                    pos += 1;
+                }
+                Token::Class => {
+                    return true; // Found 'class' keyword, this is a class declaration
+                }
+                Token::Fun => {
+                    return false; // Found 'fun' keyword, this is a function declaration
+                }
+                _ => {
+                    return false; // Unexpected token
+                }
+            }
+        }
+        
+        false // End of tokens without finding 'class' or 'fun'
+    }
+
     pub fn match_token(&mut self, token: &Token) -> bool {
         if self.check(token) {
             self.advance();
@@ -648,7 +761,11 @@ impl Parser {
         let mut segments = Vec::new();
         
         // First segment must be an identifier
-        segments.push(self.consume_identifier("Expected module name")?);
+        if let Token::Identifier(name) = self.peek() {
+            segments.push(self.consume_identifier("Expected module name")?);
+        } else {
+            return Err(self.error(&format!("Expected module name, found {:?} at position {}", self.peek(), self.current)));
+        }
         
         // Parse additional segments separated by dots
         while self.match_token(&Token::Dot) {

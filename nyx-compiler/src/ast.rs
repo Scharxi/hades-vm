@@ -15,6 +15,105 @@ pub struct Struct {
 }
 
 #[derive(Debug, Clone)]
+pub struct Class {
+    pub name: String,
+    pub visibility: Visibility,
+    pub modifiers: Vec<ClassModifier>,
+    pub type_params: Vec<TypeParameter>,
+    pub super_class: Option<Type>,
+    pub interfaces: Vec<Type>,
+    pub body: ClassBody,
+}
+
+#[derive(Debug, Clone)]
+pub enum ClassModifier {
+    Open,
+    Abstract,
+    Final,
+    Data,
+    Sealed,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassBody {
+    pub constructors: Vec<Constructor>,
+    pub properties: Vec<Property>,
+    pub methods: Vec<Method>,
+    pub init_blocks: Vec<InitBlock>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Constructor {
+    pub visibility: Visibility,
+    pub is_primary: bool,
+    pub parameters: Vec<ConstructorParameter>,
+    pub body: Option<Block>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConstructorParameter {
+    pub name: String,
+    pub type_: Type,
+    pub default_value: Option<Expression>,
+    pub is_val: bool,
+    pub is_var: bool,
+    pub visibility: Option<Visibility>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Property {
+    pub name: String,
+    pub visibility: Visibility,
+    pub modifiers: Vec<PropertyModifier>,
+    pub type_: Type,
+    pub initializer: Option<Expression>,
+    pub getter: Option<Accessor>,
+    pub setter: Option<Accessor>,
+}
+
+#[derive(Debug, Clone)]
+pub enum PropertyModifier {
+    Override,
+    Open,
+    Final,
+    Abstract,
+    Const,
+    Late,
+}
+
+#[derive(Debug, Clone)]
+pub struct Accessor {
+    pub visibility: Option<Visibility>,
+    pub body: Option<Block>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Method {
+    pub name: String,
+    pub visibility: Visibility,
+    pub modifiers: Vec<MethodModifier>,
+    pub type_params: Vec<TypeParameter>,
+    pub parameters: Vec<Parameter>,
+    pub return_type: Type,
+    pub body: Option<Block>,
+}
+
+#[derive(Debug, Clone)]
+pub enum MethodModifier {
+    Override,
+    Open,
+    Final,
+    Abstract,
+    Suspend,
+    Inline,
+}
+
+#[derive(Debug, Clone)]
+pub struct InitBlock {
+    pub body: Block,
+}
+
+#[derive(Debug, Clone)]
 pub struct StructField {
     pub name: String,
     pub visibility: Visibility,
@@ -104,6 +203,7 @@ pub enum Item {
     Trait(Trait),
     Implementation(Implementation),
     Module(ModuleDecl),
+    Class(Class),
 }
 
 /// A function with visibility modifier
@@ -174,6 +274,24 @@ pub enum Expression {
         then_expr: Box<Expression>,
         else_expr: Box<Expression>,
     },
+    // Class instance creation
+    ObjectCreation {
+        class_name: String,
+        arguments: Vec<Expression>,
+    },
+    // Property access: object.property
+    PropertyAccess {
+        object: Box<Expression>,
+        property: String,
+    },
+    // Method call: object.method(args)
+    MethodCall {
+        object: Box<Expression>,
+        method: String,
+        arguments: Vec<Expression>,
+    },
+    // This expression
+    This,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -213,6 +331,13 @@ pub enum Type {
     Bool,
     String,
     Void,
+    // User-defined class type
+    Class(String),
+    // Generic type with parameters
+    Generic {
+        name: String,
+        type_params: Vec<Type>,
+    },
 }
 
 impl fmt::Display for Type {
@@ -223,6 +348,19 @@ impl fmt::Display for Type {
             Type::Bool => write!(f, "Bool"),
             Type::String => write!(f, "String"),
             Type::Void => write!(f, "Void"),
+            Type::Class(name) => write!(f, "{}", name),
+            Type::Generic { name, type_params } => {
+                write!(f, "{}", name)?;
+                if !type_params.is_empty() {
+                    write!(f, "<")?;
+                    for (i, param) in type_params.iter().enumerate() {
+                        if i > 0 { write!(f, ", ")?; }
+                        write!(f, "{}", param)?;
+                    }
+                    write!(f, ">")?;
+                }
+                Ok(())
+            }
         }
     }
 }

@@ -122,6 +122,8 @@ impl CodeGenerator {
                 Type::Bool => IRValue::boolean_constant(false),
                 Type::String => IRValue::string_constant(""),
                 Type::Void => IRValue::undefined(IRType::void()),
+                Type::Class(_) => IRValue::undefined(IRType::pointer(IRType::void())), // Placeholder for class instances
+                Type::Generic { .. } => IRValue::undefined(IRType::pointer(IRType::void())), // Placeholder for generic types
             };
             
             let ret_inst = IRInstruction::ret(Some(return_value));
@@ -325,6 +327,27 @@ impl CodeGenerator {
                 // A full implementation would need proper control flow
                 self.generate_expression(then_expr, ir_function)
             }
+            
+            // Class-related expressions (placeholders for now)
+            Expression::ObjectCreation { class_name: _, arguments: _ } => {
+                // TODO: Implement class instantiation
+                Ok(IRValue::undefined(IRType::pointer(IRType::void())))
+            }
+            
+            Expression::PropertyAccess { object: _, property: _ } => {
+                // TODO: Implement property access
+                Ok(IRValue::undefined(IRType::i32()))
+            }
+            
+            Expression::MethodCall { object: _, method: _, arguments: _ } => {
+                // TODO: Implement method calls
+                Ok(IRValue::undefined(IRType::i32()))
+            }
+            
+            Expression::This => {
+                // TODO: Implement 'this' reference
+                Ok(IRValue::undefined(IRType::pointer(IRType::void())))
+            }
         }
     }
 
@@ -344,6 +367,8 @@ impl CodeGenerator {
             Type::Bool => IRType::boolean(),
             Type::String => IRType::string(),
             Type::Void => IRType::void(),
+            Type::Class(_) => IRType::pointer(IRType::void()), // Placeholder for class types
+            Type::Generic { .. } => IRType::pointer(IRType::void()), // Placeholder for generic types
         }
     }
 

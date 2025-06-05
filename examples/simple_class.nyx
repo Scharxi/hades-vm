@@ -1,0 +1,11 @@
+// Einfaches Klassen-Beispiel
+class Person(val name: String, var age: Int) {
+    fun greet(): String {
+        return "Hello, I'm " + name
+    }
+}
+
+fun main(): Int {
+    let person = Person("Alice", 25)
+    return 0
+} 

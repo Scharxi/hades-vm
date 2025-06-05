@@ -1,0 +1,160 @@
+// Klassen-Demo für Hades VM
+// Demonstration der Kotlin-ähnlichen Klassensyntax
+
+// Einfache Klasse mit primärem Constructor
+class Person(val name: String, var age: Int) {
+    // Property mit custom getter/setter
+    var email: String = ""
+        get() = field
+        set(value) {
+            field = value.toLowerCase()
+        }
+    
+    // Init block
+    init {
+        println("Person created: $name")
+    }
+    
+    // Methode
+    fun greet(): String {
+        return "Hello, I'm $name and I'm $age years old"
+    }
+    
+    // Methode mit Parameter
+    fun celebrateBirthday() {
+        age = age + 1
+        println("Happy birthday! Now I'm $age")
+    }
+}
+
+// Data class
+data class Point(val x: Int, val y: Int) {
+    fun distanceFromOrigin(): Float {
+        return sqrt(x * x + y * y)
+    }
+}
+
+// Open class (kann vererbt werden)
+open class Animal(val name: String) {
+    open fun makeSound(): String {
+        return "Some generic animal sound"
+    }
+    
+    fun sleep() {
+        println("$name is sleeping")
+    }
+}
+
+// Klasse mit Vererbung
+class Dog(name: String, val breed: String) : Animal(name) {
+    override fun makeSound(): String {
+        return "Woof!"
+    }
+    
+    fun wagTail() {
+        println("$name is wagging tail")
+    }
+}
+
+// Abstract class
+abstract class Shape {
+    abstract fun area(): Float
+    abstract fun perimeter(): Float
+    
+    fun describe(): String {
+        return "This shape has area ${area()} and perimeter ${perimeter()}"
+    }
+}
+
+// Konkrete Implementierung einer abstrakten Klasse
+class Circle(val radius: Float) : Shape() {
+    override fun area(): Float {
+        return 3.14159 * radius * radius
+    }
+    
+    override fun perimeter(): Float {
+        return 2.0 * 3.14159 * radius
+    }
+}
+
+class Rectangle(val width: Float, val height: Float) : Shape() {
+    override fun area(): Float {
+        return width * height
+    }
+    
+    override fun perimeter(): Float {
+        return 2.0 * (width + height)
+    }
+}
+
+// Sealed class (nur bestimmte Subklassen erlaubt)
+sealed class Result {
+    data class Success(val data: String) : Result()
+    data class Error(val message: String) : Result()
+    object Loading : Result()
+}
+
+// Companion object (ähnlich static in Java)
+class Calculator {
+    companion object {
+        fun add(a: Int, b: Int): Int {
+            return a + b
+        }
+        
+        fun multiply(a: Int, b: Int): Int {
+            return a * b
+        }
+    }
+    
+    fun divide(a: Float, b: Float): Float {
+        if (b == 0.0) {
+            throw Error("Division by zero")
+        }
+        return a / b
+    }
+}
+
+// Hauptfunktion zum Testen der Klassen
+fun main(): Int {
+    // Person erstellen
+    let person = Person("Alice", 25)
+    person.email = "ALICE@EXAMPLE.COM"
+    println(person.greet())
+    person.celebrateBirthday()
+    
+    // Data class verwenden
+    let point = Point(3, 4)
+    println("Point: (${point.x}, ${point.y})")
+    println("Distance from origin: ${point.distanceFromOrigin()}")
+    
+    // Vererbung verwenden
+    let dog = Dog("Buddy", "Golden Retriever")
+    println(dog.makeSound())
+    dog.wagTail()
+    dog.sleep()
+    
+    // Polymorphismus mit abstrakten Klassen
+    let circle = Circle(5.0)
+    let rectangle = Rectangle(4.0, 6.0)
+    
+    println(circle.describe())
+    println(rectangle.describe())
+    
+    // Sealed class verwenden
+    let result = Result.Success("Data loaded successfully")
+    when (result) {
+        is Result.Success -> println("Success: ${result.data}")
+        is Result.Error -> println("Error: ${result.message}")
+        is Result.Loading -> println("Loading...")
+    }
+    
+    // Companion object verwenden
+    let sum = Calculator.add(10, 20)
+    println("Sum: $sum")
+    
+    let calc = Calculator()
+    let quotient = calc.divide(10.0, 3.0)
+    println("Quotient: $quotient")
+    
+    return 0
+} 
