@@ -42,7 +42,54 @@ impl Parser {
         Ok(Program { functions })
     }
 
-    fn parse_function(&mut self) -> ParseResult<Function> {
+    /// Parse a module-aware program that can include imports and modules
+    pub fn parse_module_aware_program(&mut self) -> ParseResult<ModuleAwareProgram> {
+        let mut imports = Vec::new();
+        let mut functions = Vec::new();
+        let mut modules = Vec::new();
+        
+        while !self.is_at_end() {
+            match self.peek() {
+                Token::Import => {
+                    imports.push(self.parse_import()?);
+                }
+                // Check for module declarations with any visibility modifier
+                Token::Mod | Token::Pub | Token::Internal | Token::Protected | Token::Package => {
+                    // Look ahead to see if this is a module or function declaration
+                    if self.is_module_declaration() {
+                        modules.push(self.parse_module_declaration()?);
+                    } else {
+                        functions.push(self.parse_function()?);
+                    }
+                }
+                Token::Fun => {
+                    functions.push(self.parse_function()?);
+                }
+                _ => {
+                    return Err(self.error("Expected import, module, or function declaration"));
+                }
+            }
+        }
+        
+        Ok(ModuleAwareProgram {
+            imports,
+            functions,
+            modules,
+        })
+    }
+
+    pub fn parse_function(&mut self) -> ParseResult<Function> {
+        // Parse visibility first (could be at the start before 'fun')
+        let visibility = if matches!(self.peek(), Token::Pub | Token::Internal | Token::Protected | Token::Package) {
+            self.parse_visibility()?
+        } else {
+            Visibility::Private
+        };
+
+        self.parse_function_with_visibility(visibility)
+    }
+
+    fn parse_function_with_visibility(&mut self, visibility: Visibility) -> ParseResult<Function> {
         self.consume(Token::Fun, "Expected 'fun'")?;
         
         let name = self.consume_identifier("Expected function name")?;
@@ -76,6 +123,7 @@ impl Parser {
         
         Ok(Function {
             name,
+            visibility,
             parameters,
             return_type,
             body,
@@ -88,6 +136,7 @@ impl Parser {
             Token::Float => Ok(Type::Float),
             Token::Bool => Ok(Type::Bool),
             Token::String => Ok(Type::String),
+            Token::Void => Ok(Type::Void),
             _ => Err(self.error("Expected type")),
         }
     }
@@ -315,10 +364,29 @@ impl Parser {
     }
 
     fn parse_call(&mut self) -> ParseResult<Expression> {
-        let expr = self.parse_primary()?;
+        let mut expr = self.parse_primary()?;
         
-        if let Expression::Identifier(name) = expr {
-            if self.check(&Token::LeftParen) {
+        loop {
+            if self.check(&Token::Dot) {
+                self.advance(); // consume '.'
+                
+                // Allow both identifiers and 'super' after a dot
+                let next_name = if self.check(&Token::Super) {
+                    self.advance();
+                    "super".to_string()
+                } else {
+                    self.consume_identifier("Expected identifier or 'super' after '.'")?
+                };
+                
+                // Build qualified name by combining current expression with next part
+                let qualified_name = match expr {
+                    Expression::Identifier(name) => format!("{}.{}", name, next_name),
+                    _ => return Err(self.error("Invalid qualified expression")),
+                };
+                
+                expr = Expression::Identifier(qualified_name);
+            } else if self.check(&Token::LeftParen) && matches!(expr, Expression::Identifier(_)) {
+                // Function call
                 self.advance(); // consume '('
                 
                 let mut arguments = Vec::new();
@@ -333,16 +401,19 @@ impl Parser {
                 
                 self.consume(Token::RightParen, "Expected ')' after arguments")?;
                 
-                Ok(Expression::Call {
-                    function: name,
-                    arguments,
-                })
+                if let Expression::Identifier(function_name) = expr {
+                    expr = Expression::Call {
+                        function: function_name,
+                        arguments,
+                    };
+                }
+                break;
             } else {
-                Ok(Expression::Identifier(name))
+                break;
             }
-        } else {
-            Ok(expr)
         }
+        
+        Ok(expr)
     }
 
     fn parse_primary(&mut self) -> ParseResult<Expression> {
@@ -353,6 +424,7 @@ impl Parser {
             Token::FloatLiteral(value) => Ok(Expression::Literal(Literal::Float(value))),
             Token::StringLiteral(value) => Ok(Expression::Literal(Literal::String(value))),
             Token::Identifier(name) => Ok(Expression::Identifier(name)),
+            Token::Super => Ok(Expression::Identifier("super".to_string())),
             Token::LeftParen => {
                 let expr = self.parse_expression()?;
                 self.consume(Token::RightParen, "Expected ')' after expression")?;
@@ -471,7 +543,48 @@ impl Parser {
         false
     }
 
-    fn match_token(&mut self, token: &Token) -> bool {
+    /// Check if the current tokens represent a module declaration
+    /// This looks ahead to distinguish between module and function declarations
+    /// when they both start with visibility modifiers
+    fn is_module_declaration(&self) -> bool {
+        let mut pos = self.current;
+        
+        // Skip past visibility modifiers
+        while pos < self.tokens.len() {
+            match &self.tokens[pos] {
+                Token::Pub => {
+                    pos += 1;
+                    // Handle pub(restriction) syntax
+                    if pos < self.tokens.len() && matches!(self.tokens[pos], Token::LeftParen) {
+                        pos += 1; // skip '('
+                        // Skip the restriction content
+                        while pos < self.tokens.len() && !matches!(self.tokens[pos], Token::RightParen) {
+                            pos += 1;
+                        }
+                        if pos < self.tokens.len() && matches!(self.tokens[pos], Token::RightParen) {
+                            pos += 1; // skip ')'
+                        }
+                    }
+                }
+                Token::Internal | Token::Protected | Token::Package => {
+                    pos += 1;
+                }
+                Token::Mod => {
+                    return true; // Found 'mod' keyword, this is a module declaration
+                }
+                Token::Fun => {
+                    return false; // Found 'fun' keyword, this is a function declaration
+                }
+                _ => {
+                    return false; // Unexpected token
+                }
+            }
+        }
+        
+        false // End of tokens without finding 'mod' or 'fun'
+    }
+
+    pub fn match_token(&mut self, token: &Token) -> bool {
         if self.check(token) {
             self.advance();
             true
@@ -480,7 +593,7 @@ impl Parser {
         }
     }
 
-    fn check(&self, token: &Token) -> bool {
+    pub fn check(&self, token: &Token) -> bool {
         if self.is_at_end() {
             false
         } else {
@@ -488,26 +601,26 @@ impl Parser {
         }
     }
 
-    fn advance(&mut self) -> Token {
+    pub fn advance(&mut self) -> Token {
         if !self.is_at_end() {
             self.current += 1;
         }
         self.previous().clone()
     }
 
-    fn is_at_end(&self) -> bool {
+    pub fn is_at_end(&self) -> bool {
         self.current >= self.tokens.len()
     }
 
-    fn peek(&self) -> &Token {
+    pub fn peek(&self) -> &Token {
         self.tokens.get(self.current).unwrap_or(&Token::Error)
     }
 
-    fn previous(&self) -> &Token {
+    pub fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
     }
 
-    fn consume(&mut self, token: Token, message: &str) -> ParseResult<()> {
+    pub fn consume(&mut self, token: Token, message: &str) -> ParseResult<()> {
         if self.check(&token) {
             self.advance();
             Ok(())
@@ -516,17 +629,235 @@ impl Parser {
         }
     }
 
-    fn consume_identifier(&mut self, message: &str) -> ParseResult<String> {
+    pub fn consume_identifier(&mut self, message: &str) -> ParseResult<String> {
         match self.advance() {
             Token::Identifier(name) => Ok(name),
             _ => Err(self.error(message)),
         }
     }
 
-    fn error(&self, message: &str) -> ParseError {
+    pub fn error(&self, message: &str) -> ParseError {
         ParseError {
             message: message.to_string(),
             position: self.current,
+        }
+    }
+
+    /// Parse a module path like "std.io.file"
+    pub fn parse_module_path(&mut self) -> ParseResult<ModulePath> {
+        let mut segments = Vec::new();
+        
+        // First segment must be an identifier
+        segments.push(self.consume_identifier("Expected module name")?);
+        
+        // Parse additional segments separated by dots
+        while self.match_token(&Token::Dot) {
+            segments.push(self.consume_identifier("Expected module name after '.'")?);
+        }
+        
+        Ok(ModulePath::new(segments))
+    }
+    
+    /// Parse an import statement
+    /// Syntax: import std.io.file
+    /// Syntax: import std.io.file.{read, write}
+    /// Syntax: import std.io.file as io
+    pub fn parse_import(&mut self) -> ParseResult<Import> {
+        self.consume(Token::Import, "Expected 'import'")?;
+        
+        let path = self.parse_module_path()?;
+        
+        // Check for specific items import: import mod.{item1, item2}
+        let items = if self.match_token(&Token::LeftBrace) {
+            let mut imported_items = Vec::new();
+            
+            if !self.check(&Token::RightBrace) {
+                loop {
+                    imported_items.push(self.consume_identifier("Expected item name")?);
+                    if !self.match_token(&Token::Comma) {
+                        break;
+                    }
+                }
+            }
+            
+            self.consume(Token::RightBrace, "Expected '}' after import items")?;
+            Some(imported_items)
+        } else {
+            None
+        };
+        
+        // Check for alias: import mod as alias
+        let alias = if self.match_token(&Token::As) {
+            Some(self.consume_identifier("Expected alias name")?)
+        } else {
+            None
+        };
+        
+        Ok(Import { path, items, alias })
+    }
+    
+    /// Parse visibility modifier
+    pub fn parse_visibility(&mut self) -> ParseResult<Visibility> {
+        match self.peek() {
+            Token::Pub => {
+                self.advance();
+                // Check for restricted visibility like pub(crate), pub(super), etc.
+                if self.match_token(&Token::LeftParen) {
+                    let restriction = self.parse_visibility_restriction()?;
+                    self.consume(Token::RightParen, "Expected ')' after visibility restriction")?;
+                    Ok(Visibility::Restricted { restriction })
+                } else {
+                    Ok(Visibility::Public)
+                }
+            }
+            Token::Internal => {
+                self.advance();
+                Ok(Visibility::Internal)
+            }
+            Token::Protected => {
+                self.advance();
+                Ok(Visibility::Protected)
+            }
+            Token::Package => {
+                self.advance();
+                Ok(Visibility::Package)
+            }
+            _ => Ok(Visibility::Private)
+        }
+    }
+
+    /// Parse visibility restriction for pub(restriction) syntax
+    fn parse_visibility_restriction(&mut self) -> ParseResult<VisibilityRestriction> {
+        match self.peek() {
+            Token::Crate => {
+                self.advance();
+                Ok(VisibilityRestriction::Crate)
+            }
+            Token::Super => {
+                self.advance();
+                Ok(VisibilityRestriction::Super)
+            }
+            Token::SelfKeyword => {
+                self.advance();
+                Ok(VisibilityRestriction::Module)
+            }
+            Token::In => {
+                self.advance();
+                let path = self.parse_module_path()?;
+                Ok(VisibilityRestriction::Path(path))
+            }
+            _ => Err(self.error("Expected 'crate', 'super', 'self', or 'in' after 'pub('"))
+        }
+    }
+    
+    /// Parse a module declaration
+    /// Syntax: mod mymodule { ... }
+    /// Syntax: pub mod mymodule { ... }
+    /// Supports nested modules
+    pub fn parse_module_declaration(&mut self) -> ParseResult<ModuleDecl> {
+        let visibility = self.parse_visibility()?;
+        
+        self.consume(Token::Mod, "Expected 'mod'")?;
+        let name = self.consume_identifier("Expected module name")?;
+        
+        self.consume(Token::LeftBrace, "Expected '{' after module name")?;
+        
+        let mut items = Vec::new();
+        while !self.check(&Token::RightBrace) && !self.is_at_end() {
+            // Parse items with their own visibility modifiers
+            if self.is_module_declaration() {
+                let nested_module = self.parse_module_declaration()?;
+                items.push(Item::Module(nested_module));
+            } else if matches!(self.peek(), Token::Pub | Token::Internal | Token::Protected | Token::Package | Token::Fun) {
+                let function = self.parse_function()?;
+                items.push(Item::Function(function));
+            } else {
+                return Err(self.error("Expected function or module declaration"));
+            }
+        }
+        
+        self.consume(Token::RightBrace, "Expected '}' after module items")?;
+        
+        Ok(ModuleDecl {
+            name,
+            visibility,
+            items,
+        })
+    }
+    
+    /// Parse a nested module path for imports and qualified calls
+    /// Supports paths like: std::collections::vector or std.collections.vector
+    pub fn parse_nested_module_path(&mut self) -> ParseResult<ModulePath> {
+        let mut segments = Vec::new();
+        
+        // First segment must be an identifier
+        segments.push(self.consume_identifier("Expected module name")?);
+        
+        // Parse additional segments separated by dots or double colons
+        while self.match_token(&Token::Dot) || self.check_double_colon() {
+            if self.check_double_colon() {
+                self.advance(); // consume first ':'
+                self.advance(); // consume second ':'
+            }
+            segments.push(self.consume_identifier("Expected module name after separator")?);
+        }
+        
+        Ok(ModulePath::new(segments))
+    }
+    
+    /// Check for double colon (::) sequence
+    fn check_double_colon(&self) -> bool {
+        if self.current + 1 < self.tokens.len() {
+            matches!(self.peek(), Token::Colon) && matches!(self.tokens[self.current + 1], Token::Colon)
+        } else {
+            false
+        }
+    }
+    
+    /// Parse qualified function calls with nested module paths
+    /// Supports calls like: std::collections::vector::new() or std.collections.vector.new()
+    fn parse_qualified_call(&mut self, base_name: String) -> ParseResult<Expression> {
+        let mut path_segments = vec![base_name];
+        
+        // Parse the full qualified path
+        while self.check(&Token::Dot) || self.check_double_colon() {
+            if self.check_double_colon() {
+                self.advance(); // consume first ':'
+                self.advance(); // consume second ':'
+            } else {
+                self.advance(); // consume '.'
+            }
+            
+            path_segments.push(self.consume_identifier("Expected identifier after separator")?);
+        }
+        
+        // Check if this is a function call
+        if self.check(&Token::LeftParen) {
+            self.advance(); // consume '('
+            
+            let mut arguments = Vec::new();
+            if !self.check(&Token::RightParen) {
+                loop {
+                    arguments.push(self.parse_expression()?);
+                    if !self.match_token(&Token::Comma) {
+                        break;
+                    }
+                }
+            }
+            
+            self.consume(Token::RightParen, "Expected ')' after arguments")?;
+            
+            // Join path segments for the qualified function name
+            let qualified_name = path_segments.join("::");
+            
+            Ok(Expression::Call {
+                function: qualified_name,
+                arguments,
+            })
+        } else {
+            // Just a qualified identifier, not a function call
+            let qualified_name = path_segments.join("::");
+            Ok(Expression::Identifier(qualified_name))
         }
     }
 }

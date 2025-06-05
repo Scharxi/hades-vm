@@ -1,0 +1,5 @@
+// Main entry point for the math library package
+
+fun main(a: Int, b: Int): Int {
+    return a + b
+}

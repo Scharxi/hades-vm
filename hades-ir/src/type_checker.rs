@@ -1,10 +1,8 @@
-use std::sync::Arc;
 use crate::error::{Error, Result};
 use crate::Type;
 use crate::Value;
 use crate::Function;
 use crate::instruction::{Instruction, Operation};
-use crate::basic_block::BasicBlock;
 
 /// Type checker for the Hades IR
 pub struct TypeChecker;

@@ -1,0 +1,16 @@
+// String utility functions
+pub fun is_empty(s: String): Bool {
+    return length(s) == 0
+}
+
+pub fun length(s: String): Int {
+    return 42  // placeholder implementation
+}
+
+pub fun uppercase(s: String): String {
+    return "UPPER"  // placeholder implementation
+}
+
+pub fun lowercase(s: String): String {
+    return "lower"  // placeholder implementation
+} 

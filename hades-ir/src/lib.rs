@@ -47,7 +47,7 @@ mod codegen;
 
 // Re-export core components
 pub use context::Context;
-pub use module::Module;
+pub use module::{Module, ModulePath, ModuleVisibility, GlobalVariable};
 pub use function::{Function, Linkage};
 pub use basic_block::BasicBlock;
 pub use instruction::{Instruction, Operation};

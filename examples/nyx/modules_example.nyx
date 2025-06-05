@@ -1,0 +1,31 @@
+// Example showcasing Nyx module system
+
+import std.io
+import std.math.{sin, cos, pi}
+import std.collections.list as List
+
+pub mod math_utils {
+    pub fun square(x: Int): Int {
+        return x * x
+    }
+    
+    pub fun cube(x: Int): Int {
+        return x * x * x
+    }
+    
+    fun private_helper(x: Int): Int {
+        return x + 1
+    }
+}
+
+mod internal {
+    fun internal_function(): Int {
+        return 42
+    }
+}
+
+fun main(): Int {
+    val squared = math_utils.square(5)
+    val cubed = math_utils.cube(3)
+    return squared + cubed
+} 

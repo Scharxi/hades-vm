@@ -23,6 +23,36 @@ pub enum Token {
     #[token("false")]
     False,
 
+    // Module system keywords
+    #[token("mod")]
+    Mod,
+    #[token("import")]
+    Import,
+    #[token("export")]
+    Export,
+    #[token("pub")]
+    Pub,
+    #[token("from")]
+    From,
+    #[token("as")]
+    As,
+
+    // Visibility keywords
+    #[token("internal")]
+    Internal,
+    #[token("protected")]
+    Protected,
+    #[token("package")]
+    Package,
+    #[token("crate")]
+    Crate,
+    #[token("super")]
+    Super,
+    #[token("self")]
+    SelfKeyword,
+    #[token("in")]
+    In,
+
     // Types
     #[token("Int")]
     Int,
@@ -32,6 +62,8 @@ pub enum Token {
     Bool,
     #[token("String")]
     String,
+    #[token("Void")]
+    Void,
 
     // Built-in functions for memory operations
     #[token("alloc")]
@@ -86,6 +118,8 @@ pub enum Token {
     Comma,
     #[token(":")]
     Colon,
+    #[token(".")]
+    Dot,
 
     // Literals and identifiers
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
@@ -123,10 +157,17 @@ impl fmt::Display for Token {
             Token::Return => write!(f, "return"),
             Token::True => write!(f, "true"),
             Token::False => write!(f, "false"),
+            Token::Mod => write!(f, "mod"),
+            Token::Import => write!(f, "import"),
+            Token::Export => write!(f, "export"),
+            Token::Pub => write!(f, "pub"),
+            Token::From => write!(f, "from"),
+            Token::As => write!(f, "as"),
             Token::Int => write!(f, "Int"),
             Token::Float => write!(f, "Float"),
             Token::Bool => write!(f, "Bool"),
             Token::String => write!(f, "String"),
+            Token::Void => write!(f, "Void"),
             Token::Alloc => write!(f, "alloc"),
             Token::Free => write!(f, "free"),
             Token::Load => write!(f, "load"),
@@ -151,11 +192,19 @@ impl fmt::Display for Token {
             Token::RightBrace => write!(f, "}}"),
             Token::Comma => write!(f, ","),
             Token::Colon => write!(f, ":"),
+            Token::Dot => write!(f, "."),
             Token::Identifier(name) => write!(f, "{}", name),
             Token::IntegerLiteral(value) => write!(f, "{}", value),
             Token::FloatLiteral(value) => write!(f, "{}", value),
             Token::StringLiteral(value) => write!(f, "\"{}\"", value),
             Token::Error => write!(f, "ERROR"),
+            Token::Internal => write!(f, "internal"),
+            Token::Protected => write!(f, "protected"),
+            Token::Package => write!(f, "package"),
+            Token::Crate => write!(f, "crate"),
+            Token::Super => write!(f, "super"),
+            Token::SelfKeyword => write!(f, "self"),
+            Token::In => write!(f, "in"),
         }
     }
 }

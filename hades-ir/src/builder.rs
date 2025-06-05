@@ -87,7 +87,7 @@ impl Builder {
     }
     
     /// Build an instruction and insert it at the current insertion point
-    fn build_instruction(&mut self, mut instruction: Instruction) -> Result<Value> {
+    fn build_instruction(&mut self, instruction: Instruction) -> Result<Value> {
         if let Some(block) = &self.current_block {
             // Clone the instruction before adding metadata
             let result_type = instruction.result_type();

@@ -1,0 +1,10 @@
+[package]
+name = "no-stdlib-demo"
+version = "0.1.0"
+main = "src/main.nyx"
+include_stdlib = false
+
+[build]
+output_dir = "build"
+target = "hades-vm"
+optimization = "debug"

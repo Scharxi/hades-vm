@@ -9,6 +9,7 @@ pub struct TypeParameter {
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub name: String,
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub fields: Vec<StructField>,
 }
@@ -16,6 +17,7 @@ pub struct Struct {
 #[derive(Debug, Clone)]
 pub struct StructField {
     pub name: String,
+    pub visibility: Visibility,
     pub type_: Type,
     pub is_mutable: bool,
 }
@@ -23,6 +25,7 @@ pub struct StructField {
 #[derive(Debug, Clone)]
 pub struct Enum {
     pub name: String,
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub variants: Vec<EnumVariant>,
 }
@@ -36,6 +39,7 @@ pub struct EnumVariant {
 #[derive(Debug, Clone)]
 pub struct Trait {
     pub name: String,
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub supertraits: Vec<Type>,
     pub items: Vec<TraitItem>,
@@ -72,6 +76,7 @@ pub struct TraitConst {
 
 #[derive(Debug, Clone)]
 pub struct Implementation {
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub target_type: Type,
     pub trait_name: Option<Type>,
@@ -83,6 +88,14 @@ pub struct Program {
     pub functions: Vec<Function>,
 }
 
+/// A module-aware program that can handle both standalone functions and modules
+#[derive(Debug, Clone)]
+pub struct ModuleAwareProgram {
+    pub imports: Vec<Import>,
+    pub functions: Vec<Function>,
+    pub modules: Vec<ModuleDecl>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Item {
     Function(Function),
@@ -90,11 +103,14 @@ pub enum Item {
     Enum(Enum),
     Trait(Trait),
     Implementation(Implementation),
+    Module(ModuleDecl),
 }
 
+/// A function with visibility modifier
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
+    pub visibility: Visibility,
     pub parameters: Vec<Parameter>,
     pub return_type: Type,
     pub body: Block,
@@ -196,6 +212,7 @@ pub enum Type {
     Float,
     Bool,
     String,
+    Void,
 }
 
 impl fmt::Display for Type {
@@ -205,6 +222,7 @@ impl fmt::Display for Type {
             Type::Float => write!(f, "Float"),
             Type::Bool => write!(f, "Bool"),
             Type::String => write!(f, "String"),
+            Type::Void => write!(f, "Void"),
         }
     }
 }
@@ -235,4 +253,153 @@ impl fmt::Display for UnaryOperator {
             UnaryOperator::Not => write!(f, "!"),
         }
     }
+}
+
+/// A module path for referencing items in other modules
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ModulePath {
+    pub segments: Vec<String>,
+}
+
+impl ModulePath {
+    pub fn new(segments: Vec<String>) -> Self {
+        Self { segments }
+    }
+    
+    pub fn single(name: String) -> Self {
+        Self { segments: vec![name] }
+    }
+    
+    /// Create a root module path
+    pub fn root() -> Self {
+        Self { segments: vec![] }
+    }
+    
+    /// Append a segment to this path
+    pub fn append(&self, segment: String) -> Self {
+        let mut new_segments = self.segments.clone();
+        new_segments.push(segment);
+        Self { segments: new_segments }
+    }
+    
+    /// Get the parent path (all segments except the last)
+    pub fn parent(&self) -> Option<Self> {
+        if self.segments.is_empty() {
+            None
+        } else {
+            Some(Self { segments: self.segments[..self.segments.len() - 1].to_vec() })
+        }
+    }
+    
+    /// Get the module name (last segment)
+    pub fn name(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+    
+    /// Check if this path is a parent of the other path
+    pub fn is_parent_of(&self, other: &ModulePath) -> bool {
+        if self.segments.len() >= other.segments.len() {
+            return false;
+        }
+        
+        for (i, segment) in self.segments.iter().enumerate() {
+            if other.segments.get(i) != Some(segment) {
+                return false;
+            }
+        }
+        
+        true
+    }
+    
+    /// Check if this path is a child of the other path
+    pub fn is_child_of(&self, other: &ModulePath) -> bool {
+        other.is_parent_of(self)
+    }
+    
+    /// Check if this path is an ancestor of the other path
+    pub fn is_ancestor_of(&self, other: &ModulePath) -> bool {
+        self.is_parent_of(other) || self.segments == other.segments[..self.segments.len().min(other.segments.len())]
+    }
+}
+
+impl fmt::Display for ModulePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.segments.join("."))
+    }
+}
+
+/// Visibility modifier for items
+#[derive(Debug, Clone, PartialEq)]
+pub enum Visibility {
+    /// Publicly visible to all modules and external code
+    Public,
+    /// Only visible within the current module
+    Private,
+    /// Visible within the current package/crate, but not to external code
+    Internal,
+    /// Visible to the current module and all its submodules
+    Protected,
+    /// Visible within the package but with additional restrictions
+    Package,
+    /// Restricted visibility with custom path specification
+    Restricted {
+        /// The path that defines the scope of visibility
+        /// e.g., `pub(crate)`, `pub(super)`, `pub(in path::to::module)`
+        restriction: VisibilityRestriction,
+    },
+}
+
+/// Restrictions for visibility modifiers
+#[derive(Debug, Clone, PartialEq)]
+pub enum VisibilityRestriction {
+    /// Visible throughout the current crate
+    Crate,
+    /// Visible to the parent module
+    Super,
+    /// Visible to a specific module path
+    Path(ModulePath),
+    /// Visible only within the current module and its children
+    Module,
+}
+
+impl fmt::Display for Visibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Visibility::Public => write!(f, "pub"),
+            Visibility::Private => write!(f, ""),
+            Visibility::Internal => write!(f, "internal"),
+            Visibility::Protected => write!(f, "protected"),
+            Visibility::Package => write!(f, "package"),
+            Visibility::Restricted { restriction } => {
+                write!(f, "pub({})", restriction)
+            }
+        }
+    }
+}
+
+impl fmt::Display for VisibilityRestriction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VisibilityRestriction::Crate => write!(f, "crate"),
+            VisibilityRestriction::Super => write!(f, "super"),
+            VisibilityRestriction::Path(path) => write!(f, "in {}", path),
+            VisibilityRestriction::Module => write!(f, "self"),
+        }
+    }
+}
+
+/// An import statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct Import {
+    pub path: ModulePath,
+    pub items: Option<Vec<String>>, // None means import all, Some means import specific items
+    pub alias: Option<String>,
+}
+
+/// A module declaration
+#[derive(Debug, Clone)]
+pub struct ModuleDecl {
+    pub name: String,
+    pub visibility: Visibility,
+    pub items: Vec<Item>,
 } 

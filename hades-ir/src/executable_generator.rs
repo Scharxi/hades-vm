@@ -6,7 +6,6 @@ use crate::{
     module::Module,
     function::Function,
     value::Value,
-    types::Type,
 };
 
 /// Generator for complete Hades Executable (HEX) files
@@ -352,7 +351,7 @@ mod tests {
         
         // Create a simple module with a main function
         let context = Arc::new(Context::new());
-        let mut module = Module::new(context.clone(), "test".to_string());
+        let mut module = Module::new_root(context.clone(), "test".to_string());
         
         // Create main function
         let main_type = IRType::function(IRType::i32(), vec![], false);

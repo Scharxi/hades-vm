@@ -1,0 +1,37 @@
+// Shapes submodule of geometry
+// This file represents math::geometry::shapes module
+
+// Public shape calculation functions
+pub fun triangle_area(base: Int, height: Int): Int {
+    let full_area = super::area_rectangle(base, height)
+    return super::super::divide_helper(full_area, 2)
+}
+
+pub fun circle_area_approximation(radius: Int): Int {
+    // Simplified approximation: 3 * radius * radius
+    let radius_squared = super::super::multiply_helper(radius, radius)
+    return super::super::multiply_helper(radius_squared, 3)
+}
+
+// Protected function for potential child modules
+protected fun polygon_area_helper(sides: Int, side_length: Int): Int {
+    // Simplified calculation
+    return super::super::multiply_helper(sides, side_length)
+}
+
+// Private function
+fun internal_shape_calc(): Int {
+    return super::geometry_internal()
+}
+
+// Demonstrate accessing deeply nested hierarchy
+pub fun complex_calculation(): Int {
+    let rect_area = super::area_rectangle(10, 5)
+    let tri_area = triangle_area(10, 5)
+    let circ_area = circle_area_approximation(5)
+    
+    let sum1 = super::super::add(rect_area, tri_area)
+    let sum2 = super::super::add(sum1, circ_area)
+    
+    return sum2
+} 

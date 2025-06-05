@@ -1,10 +1,8 @@
-use std::sync::Arc;
 use std::collections::HashMap;
 
 use crate::{
     Function,
     Value,
-    Type,
     BasicBlock,
     Instruction,
     Operation,

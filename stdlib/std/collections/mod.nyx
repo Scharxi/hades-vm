@@ -1,0 +1,14 @@
+// Standard Collections module for Nyx
+// Provides basic data structure utilities
+// Note: This is a placeholder until proper data structures are implemented
+
+pub fun array_length(): Int {
+    // Placeholder for array length function
+    // This would need proper array/list support in the language
+    return 0
+}
+
+pub fun is_empty(): Bool {
+    // Placeholder for checking if a collection is empty
+    return true
+} 

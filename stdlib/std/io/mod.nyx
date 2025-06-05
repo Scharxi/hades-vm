@@ -1,0 +1,24 @@
+// Standard I/O module for Nyx
+// Provides basic input/output functionality
+
+pub fun print(message: String): Int {
+    // This would be implemented by the runtime/VM
+    // For now, it's a placeholder that returns 0 for success
+    return 0
+}
+
+pub fun println(message: String): Int {
+    // Print with newline
+    // This would be implemented by the runtime/VM
+    return 0
+}
+
+pub fun print_int(value: Int): Int {
+    // Print an integer value
+    return 0
+}
+
+pub fun print_float(value: Float): Int {
+    // Print a float value
+    return 0
+} 

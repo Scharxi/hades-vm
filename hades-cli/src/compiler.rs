@@ -71,12 +71,19 @@ impl Compiler {
         let mut bytecode = Vec::new();
         let mut context = CompilerContext::new();
         
-        // First pass: count local variables
+        // First, add function parameters to the context
+        // Parameters are already on the stack in forward order (a, b, ...)
+        for param in &main_fn.parameters {
+            context.declare_variable(param.name.clone());
+        }
+        
+        // First pass: count local variables (excluding parameters)
         self.count_locals(&main_fn.body, &mut context);
-        let local_count = context.next_local_index;
+        let local_count = context.next_local_index - main_fn.parameters.len(); // Subtract parameters
         
         if self.debug {
-            println!("Function needs {} local variables", local_count);
+            println!("Function has {} parameters and needs {} local variables", 
+                     main_fn.parameters.len(), local_count);
         }
         
         // Pre-allocate space for local variables by pushing zeros onto the stack
@@ -85,12 +92,15 @@ impl Compiler {
         }
         
         // Create stack frame for main function using CreateFrame (0x40)
-        // The parameter count includes the local variables we just pushed
-        let param_count = main_fn.parameters.len() + local_count;
-        bytecode.extend_from_slice(&[0x00, 0x00, param_count as u8, 0x40]); // CreateFrame instruction
+        // The parameter count includes the parameters and local variables
+        let total_frame_size = main_fn.parameters.len() + local_count;
+        bytecode.extend_from_slice(&[0x00, 0x00, total_frame_size as u8, 0x40]); // CreateFrame instruction
         
-        // Reset context for actual compilation
+        // Reset context and re-add parameters for actual compilation
         context = CompilerContext::new();
+        for param in &main_fn.parameters {
+            context.declare_variable(param.name.clone());
+        }
         
         // Generate code for the function body
         self.compile_block(&main_fn.body, &mut bytecode, &mut context)?;

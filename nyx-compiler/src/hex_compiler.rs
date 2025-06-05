@@ -48,7 +48,7 @@ impl HexCompiler {
         }
 
         // Create IR module
-        let mut module = Module::new(self.context.clone(), "main".to_string());
+        let mut module = Module::new_root(self.context.clone(), "main".to_string());
 
         // First pass: declare all functions
         for function in &program.functions {
@@ -318,6 +318,7 @@ impl HexCompiler {
             Type::Float => IRType::f32(),
             Type::Bool => IRType::boolean(),
             Type::String => IRType::string(),
+            Type::Void => IRType::void(),
         }
     }
 }

@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use crate::{
     basic_block::BasicBlock,
-    context::Context,
     error::{Error, Result},
     types::Type,
     value::{Value, ValueId},
@@ -112,7 +111,7 @@ impl Function {
         let ty_ref = ty.clone();
         
         // Validate that the type is a function type
-        if let Type::Function { return_type, param_types, .. } = &*ty_ref {
+        if let Type::Function {  param_types, .. } = &*ty_ref {
             Ok(Self {
                 id: ValueId::new(),
                 name,

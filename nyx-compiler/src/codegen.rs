@@ -33,7 +33,7 @@ pub struct CodeGenerator {
 impl CodeGenerator {
     pub fn new() -> CodeGenResult<Self> {
         let context = Arc::new(Context::new());
-        let module = Module::new(context.clone(), "main".to_string());
+        let module = Module::new_root(context.clone(), "main".to_string());
         
         Ok(Self {
             context,
@@ -121,6 +121,7 @@ impl CodeGenerator {
                 Type::Float => IRValue::float_constant(0.0, IRType::f32()),
                 Type::Bool => IRValue::boolean_constant(false),
                 Type::String => IRValue::string_constant(""),
+                Type::Void => IRValue::undefined(IRType::void()),
             };
             
             let ret_inst = IRInstruction::ret(Some(return_value));
@@ -342,6 +343,7 @@ impl CodeGenerator {
             Type::Float => IRType::f32(),
             Type::Bool => IRType::boolean(),
             Type::String => IRType::string(),
+            Type::Void => IRType::void(),
         }
     }
 

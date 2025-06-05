@@ -1,0 +1,24 @@
+// Math module - main module file
+// This demonstrates file-based module organization
+
+// Public functions for the math module
+pub fun add(a: Int, b: Int): Int {
+    return a + b
+}
+
+pub fun subtract(a: Int, b: Int): Int {
+    return a - b
+}
+
+// Internal function only accessible within the math crate
+internal fun multiply_helper(a: Int, b: Int): Int {
+    return a * b
+}
+
+// Protected function accessible to submodules
+protected fun divide_helper(a: Int, b: Int): Int {
+    if b == 0 {
+        return 0  // Error handling simplified
+    }
+    return a / b
+} 

@@ -1,0 +1,15 @@
+// Utility functions module
+pub fun is_even(n: Int): Bool {
+    return n % 2 == 0
+}
+
+pub fun is_odd(n: Int): Bool {
+    return !is_even(n)
+}
+
+pub fun abs(n: Int): Int {
+    if n < 0 {
+        return -n
+    }
+    return n
+} 

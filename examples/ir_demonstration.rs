@@ -22,7 +22,7 @@ fn main() -> Result<()> {
     let context = Arc::new(Context::new());
     
     // Create a module
-    let mut module = Module::new(context.clone(), "example_module".to_string());
+    let mut module = Module::new_root(context.clone(), "example_module".to_string());
     module.set_source_file("ir_demonstration.rs".to_string());
     
     // Create a function type: (i32, i32) -> i32
