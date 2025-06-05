@@ -1,5 +1,5 @@
-// Main entry point for the package
+// Main entry point for the math library package
 
-fun main(): Int {
-    return 42
+fun main(a: Int, b: Int): Int {
+    return a + b
 }

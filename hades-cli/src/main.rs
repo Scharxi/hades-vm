@@ -122,16 +122,16 @@ enum PackageCommands {
         no_stdlib: bool,
     },
     
-    /// Add a dependency to the current package
+    /// Add a dependency to the package
     Add {
-        /// Package name
+        /// Dependency name
         name: String,
         
-        /// Package version or specification
+        /// Dependency version
         #[arg(short, long)]
         version: Option<String>,
         
-        /// Local path to package
+        /// Local path to the dependency
         #[arg(short, long)]
         path: Option<String>,
         
@@ -144,9 +144,9 @@ enum PackageCommands {
         dev: bool,
     },
     
-    /// Remove a dependency from the current package
+    /// Remove a dependency from the package
     Remove {
-        /// Package name
+        /// Dependency name
         name: String,
         
         /// Remove from development dependencies
@@ -154,24 +154,39 @@ enum PackageCommands {
         dev: bool,
     },
     
-    /// Install all dependencies
+    /// Install package dependencies
     Install {
-        /// Install development dependencies
+        /// Install development dependencies too
         #[arg(short, long)]
         dev: bool,
     },
     
     /// Build the current package
     Build {
-        /// Print debug information
+        /// Build with debug information
         #[arg(short, long)]
         debug: bool,
     },
     
-    /// List installed packages
+    /// Run the built package
+    Run {
+        /// Build and run with debug information
+        #[arg(short, long)]
+        debug: bool,
+        
+        /// Function arguments (for main function)
+        #[arg(short, long, num_args = 0.., value_delimiter = ' ')]
+        args: Vec<i32>,
+        
+        /// Only build, don't run
+        #[arg(short, long)]
+        build_only: bool,
+    },
+    
+    /// List installed dependencies
     List,
     
-    /// Clean package cache and build artifacts
+    /// Clean build artifacts and package cache
     Clean,
     
     /// Show package information
@@ -242,6 +257,9 @@ fn main() -> Result<()> {
                 }
                 PackageCommands::Info => {
                     handle_package_info(current_dir)?;
+                }
+                PackageCommands::Run { debug, args, build_only } => {
+                    handle_package_run(current_dir, debug, args, build_only)?;
                 }
             }
         }
@@ -512,3 +530,54 @@ fn handle_package_info(project_root: PathBuf) -> Result<()> {
     
     Ok(())
 }
+
+fn handle_package_run(
+    project_root: PathBuf,
+    debug: bool,
+    args: Vec<i32>,
+    build_only: bool,
+) -> Result<()> {
+    let package_manager = PackageManager::new(project_root)?;
+    
+    if package_manager.manifest.is_none() {
+        anyhow::bail!("No package manifest found. Run 'hades package init' first.");
+    }
+
+    // Build the package first
+    package_manager.build_package(debug)?;
+
+    if !build_only {
+        // Get the built bytecode file path
+        let manifest = package_manager.manifest.as_ref().unwrap();
+        let build_dir = package_manager.project_root.join(
+            manifest.build.as_ref()
+                .and_then(|b| b.output_dir.as_ref())
+                .unwrap_or(&"build".to_string())
+        );
+        let bytecode_path = build_dir.join(format!("{}.hvm", manifest.package.name));
+        
+        // Read the bytecode from the file
+        let bytecode = fs::read(&bytecode_path)
+            .with_context(|| format!("Failed to read built package: {}", bytecode_path.display()))?;
+        
+        // Create VM and run the bytecode
+        let mut vm = VM::new(debug);
+        
+        // Push function arguments onto the stack in forward order
+        // since we're using base_pointer + index to access them
+        for arg in args.iter() {
+            vm.push_arg(*arg)?;
+        }
+        
+        let result = vm.execute(&bytecode)?;
+        
+        if debug {
+            println!("Program completed with result: {}", result);
+        } else {
+            println!("{}", result);
+        }
+    }
+
+    Ok(())
+}
+
