@@ -19,4 +19,5 @@ chumsky = "0.9"
 indexmap = "2.1"
 
 [dev-dependencies]
-pretty_assertions = "1.4"  # For better test assertions 
+pretty_assertions = "1.4"  # For better test assertions
+tempfile = "3.8"  # For creating temporary files in tests 

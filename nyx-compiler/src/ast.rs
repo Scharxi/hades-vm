@@ -83,6 +83,14 @@ pub struct Program {
     pub functions: Vec<Function>,
 }
 
+/// A module-aware program that can handle both standalone functions and modules
+#[derive(Debug, Clone)]
+pub struct ModuleAwareProgram {
+    pub imports: Vec<Import>,
+    pub functions: Vec<Function>,
+    pub modules: Vec<ModuleDecl>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Item {
     Function(Function),
@@ -235,4 +243,49 @@ impl fmt::Display for UnaryOperator {
             UnaryOperator::Not => write!(f, "!"),
         }
     }
+}
+
+/// A module path for referencing items in other modules
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModulePath {
+    pub segments: Vec<String>,
+}
+
+impl ModulePath {
+    pub fn new(segments: Vec<String>) -> Self {
+        Self { segments }
+    }
+    
+    pub fn single(name: String) -> Self {
+        Self { segments: vec![name] }
+    }
+}
+
+impl fmt::Display for ModulePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.segments.join("."))
+    }
+}
+
+/// Visibility modifier for items
+#[derive(Debug, Clone, PartialEq)]
+pub enum Visibility {
+    Public,
+    Private,
+}
+
+/// An import statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct Import {
+    pub path: ModulePath,
+    pub items: Option<Vec<String>>, // None means import all, Some means import specific items
+    pub alias: Option<String>,
+}
+
+/// A module declaration
+#[derive(Debug, Clone)]
+pub struct ModuleDecl {
+    pub name: String,
+    pub visibility: Visibility,
+    pub items: Vec<Item>,
 } 

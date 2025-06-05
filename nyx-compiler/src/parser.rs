@@ -42,7 +42,37 @@ impl Parser {
         Ok(Program { functions })
     }
 
-    fn parse_function(&mut self) -> ParseResult<Function> {
+    /// Parse a module-aware program that can include imports and modules
+    pub fn parse_module_aware_program(&mut self) -> ParseResult<ModuleAwareProgram> {
+        let mut imports = Vec::new();
+        let mut functions = Vec::new();
+        let mut modules = Vec::new();
+        
+        while !self.is_at_end() {
+            match self.peek() {
+                Token::Import => {
+                    imports.push(self.parse_import()?);
+                }
+                Token::Mod | Token::Pub => {
+                    modules.push(self.parse_module_declaration()?);
+                }
+                Token::Fun => {
+                    functions.push(self.parse_function()?);
+                }
+                _ => {
+                    return Err(self.error("Expected import, module, or function declaration"));
+                }
+            }
+        }
+        
+        Ok(ModuleAwareProgram {
+            imports,
+            functions,
+            modules,
+        })
+    }
+
+    pub fn parse_function(&mut self) -> ParseResult<Function> {
         self.consume(Token::Fun, "Expected 'fun'")?;
         
         let name = self.consume_identifier("Expected function name")?;
@@ -318,7 +348,37 @@ impl Parser {
         let expr = self.parse_primary()?;
         
         if let Expression::Identifier(name) = expr {
-            if self.check(&Token::LeftParen) {
+            // Check for qualified call: module.function(args)
+            if self.check(&Token::Dot) {
+                self.advance(); // consume '.'
+                let method_name = self.consume_identifier("Expected method name after '.'")?;
+                let qualified_name = format!("{}.{}", name, method_name);
+                
+                if self.check(&Token::LeftParen) {
+                    self.advance(); // consume '('
+                    
+                    let mut arguments = Vec::new();
+                    if !self.check(&Token::RightParen) {
+                        loop {
+                            arguments.push(self.parse_expression()?);
+                            if !self.match_token(&Token::Comma) {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    self.consume(Token::RightParen, "Expected ')' after arguments")?;
+                    
+                    Ok(Expression::Call {
+                        function: qualified_name,
+                        arguments,
+                    })
+                } else {
+                    // Just a qualified identifier, not a function call
+                    Ok(Expression::Identifier(qualified_name))
+                }
+            } else if self.check(&Token::LeftParen) {
+                // Regular function call
                 self.advance(); // consume '('
                 
                 let mut arguments = Vec::new();
@@ -471,7 +531,7 @@ impl Parser {
         false
     }
 
-    fn match_token(&mut self, token: &Token) -> bool {
+    pub fn match_token(&mut self, token: &Token) -> bool {
         if self.check(token) {
             self.advance();
             true
@@ -480,7 +540,7 @@ impl Parser {
         }
     }
 
-    fn check(&self, token: &Token) -> bool {
+    pub fn check(&self, token: &Token) -> bool {
         if self.is_at_end() {
             false
         } else {
@@ -488,26 +548,26 @@ impl Parser {
         }
     }
 
-    fn advance(&mut self) -> Token {
+    pub fn advance(&mut self) -> Token {
         if !self.is_at_end() {
             self.current += 1;
         }
         self.previous().clone()
     }
 
-    fn is_at_end(&self) -> bool {
+    pub fn is_at_end(&self) -> bool {
         self.current >= self.tokens.len()
     }
 
-    fn peek(&self) -> &Token {
+    pub fn peek(&self) -> &Token {
         self.tokens.get(self.current).unwrap_or(&Token::Error)
     }
 
-    fn previous(&self) -> &Token {
+    pub fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
     }
 
-    fn consume(&mut self, token: Token, message: &str) -> ParseResult<()> {
+    pub fn consume(&mut self, token: Token, message: &str) -> ParseResult<()> {
         if self.check(&token) {
             self.advance();
             Ok(())
@@ -516,18 +576,121 @@ impl Parser {
         }
     }
 
-    fn consume_identifier(&mut self, message: &str) -> ParseResult<String> {
+    pub fn consume_identifier(&mut self, message: &str) -> ParseResult<String> {
         match self.advance() {
             Token::Identifier(name) => Ok(name),
             _ => Err(self.error(message)),
         }
     }
 
-    fn error(&self, message: &str) -> ParseError {
+    pub fn error(&self, message: &str) -> ParseError {
         ParseError {
             message: message.to_string(),
             position: self.current,
         }
+    }
+
+    /// Parse a module path like "std.io.file"
+    pub fn parse_module_path(&mut self) -> ParseResult<ModulePath> {
+        let mut segments = Vec::new();
+        
+        // First segment must be an identifier
+        segments.push(self.consume_identifier("Expected module name")?);
+        
+        // Parse additional segments separated by dots
+        while self.match_token(&Token::Dot) {
+            segments.push(self.consume_identifier("Expected module name after '.'")?);
+        }
+        
+        Ok(ModulePath::new(segments))
+    }
+    
+    /// Parse an import statement
+    /// Syntax: import std.io.file
+    /// Syntax: import std.io.file.{read, write}
+    /// Syntax: import std.io.file as io
+    pub fn parse_import(&mut self) -> ParseResult<Import> {
+        self.consume(Token::Import, "Expected 'import'")?;
+        
+        let path = self.parse_module_path()?;
+        
+        // Check for specific items import: import mod.{item1, item2}
+        let items = if self.match_token(&Token::LeftBrace) {
+            let mut imported_items = Vec::new();
+            
+            if !self.check(&Token::RightBrace) {
+                loop {
+                    imported_items.push(self.consume_identifier("Expected item name")?);
+                    if !self.match_token(&Token::Comma) {
+                        break;
+                    }
+                }
+            }
+            
+            self.consume(Token::RightBrace, "Expected '}' after import items")?;
+            Some(imported_items)
+        } else {
+            None
+        };
+        
+        // Check for alias: import mod as alias
+        let alias = if self.match_token(&Token::As) {
+            Some(self.consume_identifier("Expected alias name")?)
+        } else {
+            None
+        };
+        
+        Ok(Import { path, items, alias })
+    }
+    
+    /// Parse visibility modifier
+    pub fn parse_visibility(&mut self) -> Visibility {
+        if self.match_token(&Token::Pub) {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        }
+    }
+    
+    /// Parse a module declaration
+    /// Syntax: mod mymodule { ... }
+    /// Syntax: pub mod mymodule { ... }
+    pub fn parse_module_declaration(&mut self) -> ParseResult<ModuleDecl> {
+        let visibility = self.parse_visibility();
+        
+        self.consume(Token::Mod, "Expected 'mod'")?;
+        let name = self.consume_identifier("Expected module name")?;
+        
+        self.consume(Token::LeftBrace, "Expected '{' after module name")?;
+        
+        let mut items = Vec::new();
+        while !self.check(&Token::RightBrace) && !self.is_at_end() {
+            // For now, only support functions in modules
+            // Later we can extend this to support structs, etc.
+            if self.check(&Token::Fun) {
+                let function = self.parse_function()?;
+                items.push(Item::Function(function));
+            } else if self.check(&Token::Pub) {
+                // Skip the pub token for now - we'll add proper visibility support later
+                self.advance();
+                if self.check(&Token::Fun) {
+                    let function = self.parse_function()?;
+                    items.push(Item::Function(function));
+                } else {
+                    return Err(self.error("Expected 'fun' after 'pub'"));
+                }
+            } else {
+                return Err(self.error("Only functions are currently supported in modules"));
+            }
+        }
+        
+        self.consume(Token::RightBrace, "Expected '}' after module items")?;
+        
+        Ok(ModuleDecl {
+            name,
+            visibility,
+            items,
+        })
     }
 }
 

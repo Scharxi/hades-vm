@@ -23,6 +23,20 @@ pub enum Token {
     #[token("false")]
     False,
 
+    // Module system keywords
+    #[token("mod")]
+    Mod,
+    #[token("import")]
+    Import,
+    #[token("export")]
+    Export,
+    #[token("pub")]
+    Pub,
+    #[token("from")]
+    From,
+    #[token("as")]
+    As,
+
     // Types
     #[token("Int")]
     Int,
@@ -86,6 +100,8 @@ pub enum Token {
     Comma,
     #[token(":")]
     Colon,
+    #[token(".")]
+    Dot,
 
     // Literals and identifiers
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
@@ -123,6 +139,12 @@ impl fmt::Display for Token {
             Token::Return => write!(f, "return"),
             Token::True => write!(f, "true"),
             Token::False => write!(f, "false"),
+            Token::Mod => write!(f, "mod"),
+            Token::Import => write!(f, "import"),
+            Token::Export => write!(f, "export"),
+            Token::Pub => write!(f, "pub"),
+            Token::From => write!(f, "from"),
+            Token::As => write!(f, "as"),
             Token::Int => write!(f, "Int"),
             Token::Float => write!(f, "Float"),
             Token::Bool => write!(f, "Bool"),
@@ -151,6 +173,7 @@ impl fmt::Display for Token {
             Token::RightBrace => write!(f, "}}"),
             Token::Comma => write!(f, ","),
             Token::Colon => write!(f, ":"),
+            Token::Dot => write!(f, "."),
             Token::Identifier(name) => write!(f, "{}", name),
             Token::IntegerLiteral(value) => write!(f, "{}", value),
             Token::FloatLiteral(value) => write!(f, "{}", value),

@@ -1,0 +1,65 @@
+// Standard Math module for Nyx
+// Provides basic mathematical functions
+
+pub fun abs(x: Int): Int {
+    if x < 0 {
+        return -x
+    } else {
+        return x
+    }
+}
+
+pub fun max(a: Int, b: Int): Int {
+    if a > b {
+        return a
+    } else {
+        return b
+    }
+}
+
+pub fun min(a: Int, b: Int): Int {
+    if a < b {
+        return a
+    } else {
+        return b
+    }
+}
+
+pub fun pow(base: Int, exponent: Int): Int {
+    if exponent == 0 {
+        return 1
+    }
+    
+    val result = 1
+    var i = 0
+    while i < exponent {
+        val result = result * base
+        var i = i + 1
+    }
+    return result
+}
+
+// Float versions
+pub fun abs_float(x: Float): Float {
+    if x < 0.0 {
+        return -x
+    } else {
+        return x
+    }
+}
+
+pub fun max_float(a: Float, b: Float): Float {
+    if a > b {
+        return a
+    } else {
+        return b
+    }
+}
+
+pub fun min_float(a: Float, b: Float): Float {
+    if a < b {
+        return a
+    } else {
+        return b
+    }
+} 
