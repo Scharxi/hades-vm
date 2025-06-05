@@ -1,0 +1,336 @@
+/**
+ * Integer primitive type wrapper class
+ * 
+ * Provides utility methods for integer operations, conversions,
+ * and mathematical functions. This class wraps the built-in `int` type
+ * with additional functionality.
+ */
+data class Int(val value: Int) {
+    
+    /**
+     * Creates a new Int instance with the given value
+     * 
+     * @param value The integer value to wrap
+     */
+    constructor(value: Int) {
+        this.value = value
+    }
+    
+    /**
+     * Creates an Int from a string representation
+     * 
+     * @param str The string to parse as an integer
+     * @throws NumberFormatException if the string cannot be parsed
+     */
+    constructor(str: String) {
+        this.value = str.toInt()
+    }
+    
+    /**
+     * Returns the absolute value of this integer
+     * 
+     * @return A new Int with the absolute value
+     */
+    fun abs(): Int {
+        return if (this.value < 0) Int(-this.value) else this
+    }
+    
+    /**
+     * Returns the sign of this integer (-1, 0, or 1)
+     * 
+     * @return -1 if negative, 0 if zero, 1 if positive
+     */
+    fun sign(): Int {
+        return if (this.value < 0) Int(-1) 
+               else if (this.value > 0) Int(1) 
+               else Int(0)
+    }
+    
+    /**
+     * Raises this integer to the power of the given exponent
+     * 
+     * @param exponent The exponent to raise to
+     * @return A new Int with the result of the power operation
+     */
+    fun pow(exponent: Int): Int {
+        var result = 1
+        var exp = exponent.value
+        var base = this.value
+        
+        while (exp > 0) {
+            if (exp % 2 == 1) {
+                result = result * base
+            }
+            base = base * base
+            exp = exp / 2
+        }
+        
+        return Int(result)
+    }
+    
+    /**
+     * Returns the greatest common divisor of this integer and the other
+     * 
+     * @param other The other integer
+     * @return A new Int with the GCD
+     */
+    fun gcd(other: Int): Int {
+        var a = this.abs().value
+        var b = other.abs().value
+        
+        while (b != 0) {
+            val temp = b
+            b = a % b
+            a = temp
+        }
+        
+        return Int(a)
+    }
+    
+    /**
+     * Returns the least common multiple of this integer and the other
+     * 
+     * @param other The other integer
+     * @return A new Int with the LCM
+     */
+    fun lcm(other: Int): Int {
+        return Int((this.abs().value * other.abs().value) / this.gcd(other).value)
+    }
+    
+    /**
+     * Checks if this integer is even
+     * 
+     * @return true if even, false if odd
+     */
+    fun isEven(): Bool {
+        return Bool(this.value % 2 == 0)
+    }
+    
+    /**
+     * Checks if this integer is odd
+     * 
+     * @return true if odd, false if even
+     */
+    fun isOdd(): Bool {
+        return Bool(this.value % 2 != 0)
+    }
+    
+    /**
+     * Checks if this integer is prime
+     * 
+     * @return true if prime, false otherwise
+     */
+    fun isPrime(): Bool {
+        if (this.value < 2) return Bool(false)
+        if (this.value == 2) return Bool(true)
+        if (this.value % 2 == 0) return Bool(false)
+        
+        var i = 3
+        while (i * i <= this.value) {
+            if (this.value % i == 0) {
+                return Bool(false)
+            }
+            i = i + 2
+        }
+        
+        return Bool(true)
+    }
+    
+    /**
+     * Converts this integer to a Float
+     * 
+     * @return A new Float with the converted value
+     */
+    fun toFloat(): Float {
+        return Float(this.value.toFloat())
+    }
+    
+    /**
+     * Converts this integer to a String
+     * 
+     * @return A new String representation of this integer
+     */
+    override fun toString(): String {
+        return String(this.value.toString())
+    }
+    
+    /**
+     * Converts this integer to a String with the specified radix
+     * 
+     * @param radix The radix to use (2-36)
+     * @return A new String representation in the given radix
+     */
+    fun toString(radix: Int): String {
+        return String(this.value.toString(radix.value))
+    }
+    
+    /**
+     * Returns the minimum of this integer and the other
+     * 
+     * @param other The other integer
+     * @return A new Int with the minimum value
+     */
+    fun min(other: Int): Int {
+        return if (this.value < other.value) this else other
+    }
+    
+    /**
+     * Returns the maximum of this integer and the other
+     * 
+     * @param other The other integer
+     * @return A new Int with the maximum value
+     */
+    fun max(other: Int): Int {
+        return if (this.value > other.value) this else other
+    }
+    
+    /**
+     * Clamps this integer between the given minimum and maximum values
+     * 
+     * @param min The minimum value
+     * @param max The maximum value
+     * @return A new Int clamped to the range [min, max]
+     */
+    fun clamp(min: Int, max: Int): Int {
+        return this.max(min).min(max)
+    }
+    
+    /**
+     * Returns a range from this integer to the specified end (inclusive)
+     * 
+     * @param end The end value of the range
+     * @return A new IntRange
+     */
+    fun rangeTo(end: Int): IntRange {
+        return IntRange(this, end)
+    }
+    
+    /**
+     * Returns a range from this integer up to (but not including) the specified end
+     * 
+     * @param end The end value of the range (exclusive)
+     * @return A new IntRange
+     */
+    fun until(end: Int): IntRange {
+        return IntRange(this, Int(end.value - 1))
+    }
+    
+    // Arithmetic operators
+    operator fun plus(other: Int): Int = Int(this.value + other.value)
+    operator fun minus(other: Int): Int = Int(this.value - other.value)
+    operator fun times(other: Int): Int = Int(this.value * other.value)
+    operator fun div(other: Int): Int = Int(this.value / other.value)
+    operator fun rem(other: Int): Int = Int(this.value % other.value)
+    operator fun unaryMinus(): Int = Int(-this.value)
+    operator fun unaryPlus(): Int = this
+    
+    // Comparison operators
+    operator fun compareTo(other: Int): Int = Int(this.value.compareTo(other.value))
+    
+    // Equality
+    override fun equals(other: Any?): Bool {
+        return if (other is Int) Bool(this.value == other.value) else Bool(false)
+    }
+    
+    override fun hashCode(): Int {
+        return Int(this.value.hashCode())
+    }
+    
+    companion object {
+        /** The minimum value an Int can have */
+        val MIN_VALUE: Int = Int(-2147483648)
+        
+        /** The maximum value an Int can have */
+        val MAX_VALUE: Int = Int(2147483647)
+        
+        /** The value 0 */
+        val ZERO: Int = Int(0)
+        
+        /** The value 1 */
+        val ONE: Int = Int(1)
+        
+        /**
+         * Parses a string as an integer
+         * 
+         * @param str The string to parse
+         * @return A new Int with the parsed value
+         * @throws NumberFormatException if the string cannot be parsed
+         */
+        fun parse(str: String): Int {
+            return Int(str.toInt())
+        }
+        
+        /**
+         * Parses a string as an integer with the specified radix
+         * 
+         * @param str The string to parse
+         * @param radix The radix to use (2-36)
+         * @return A new Int with the parsed value
+         * @throws NumberFormatException if the string cannot be parsed
+         */
+        fun parse(str: String, radix: Int): Int {
+            return Int(str.toInt(radix.value))
+        }
+        
+        /**
+         * Tries to parse a string as an integer, returning null if it fails
+         * 
+         * @param str The string to parse
+         * @return A new Int with the parsed value, or null if parsing fails
+         */
+        fun tryParse(str: String): Int? {
+            return try {
+                Int(str.toInt())
+            } catch (e: NumberFormatException) {
+                null
+            }
+        }
+    }
+}
+
+/**
+ * Integer range class for representing ranges of integers
+ */
+data class IntRange(val start: Int, val endInclusive: Int) {
+    
+    /**
+     * Checks if the given value is contained in this range
+     * 
+     * @param value The value to check
+     * @return true if the value is in the range, false otherwise
+     */
+    fun contains(value: Int): Bool {
+        return Bool(value.value >= start.value && value.value <= endInclusive.value)
+    }
+    
+    /**
+     * Checks if this range is empty
+     * 
+     * @return true if the range is empty, false otherwise
+     */
+    fun isEmpty(): Bool {
+        return Bool(start.value > endInclusive.value)
+    }
+    
+    /**
+     * Returns the size of this range
+     * 
+     * @return The number of elements in the range
+     */
+    fun size(): Int {
+        return if (isEmpty()) Int(0) else Int(endInclusive.value - start.value + 1)
+    }
+    
+    /**
+     * Iterates over each value in the range
+     * 
+     * @param action The action to perform for each value
+     */
+    fun forEach(action: (Int) -> Void): Void {
+        var current = start.value
+        while (current <= endInclusive.value) {
+            action(Int(current))
+            current = current + 1
+        }
+    }
+} 

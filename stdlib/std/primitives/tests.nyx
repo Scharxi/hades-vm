@@ -1,0 +1,461 @@
+/**
+ * Comprehensive tests for primitive type classes in Nyx stdlib
+ * 
+ * This file contains test functions that verify the functionality
+ * of all primitive type wrapper classes: Int, Float, Bool, String, and Char.
+ * These tests ensure that all methods work correctly at runtime.
+ */
+
+import std.primitives.Int
+import std.primitives.Float
+import std.primitives.Bool
+import std.primitives.String
+import std.primitives.Char
+
+/**
+ * Test suite for Int class functionality
+ */
+pub fun testIntClass(): Void {
+    // Test basic construction
+    val number = Int(42)
+    assert(number.value == 42, "Int construction failed")
+    
+    // Test mathematical operations
+    val absolute = Int(-10).abs()
+    assert(absolute.value == 10, "abs() failed")
+    
+    val power = Int(2).pow(Int(3))
+    assert(power.value == 8, "pow() failed")
+    
+    // Test predicates
+    assert(Int(4).isEven().value == true, "isEven() failed")
+    assert(Int(7).isPrime().value == true, "isPrime() failed")
+    
+    // Test conversions
+    val floatConversion = Int(42).toFloat()
+    assert(floatConversion.value == 42.0, "toFloat() failed")
+    
+    println("✓ Int class tests passed!")
+}
+
+/**
+ * Test suite for Float class functionality
+ */
+pub fun testFloatClass(): Void {
+    // Test basic construction
+    val number = Float(3.14)
+    assert(number.value == 3.14, "Float construction failed")
+    
+    // Test string construction
+    val fromString = Float("2.718")
+    assert(fromString.value == 2.718, "Float from string failed")
+    
+    // Test int construction
+    val fromInt = Float(Int(42))
+    assert(fromInt.value == 42.0, "Float from int failed")
+    
+    // Test mathematical operations
+    val absolute = Float(-3.14).abs()
+    assert(absolute.value == 3.14, "abs() failed")
+    
+    val sign = Float(-2.5).sign()
+    assert(sign.value == -1.0, "sign() failed")
+    
+    val rounded = Float(3.7).round()
+    assert(rounded.value == 4.0, "round() failed")
+    
+    val floored = Float(3.7).floor()
+    assert(floored.value == 3.0, "floor() failed")
+    
+    val ceiled = Float(3.2).ceil()
+    assert(ceiled.value == 4.0, "ceil() failed")
+    
+    // Test trigonometric functions (approximate checks)
+    val sine = Float.PI.sin()
+    assert(sine.abs().value < 0.001, "sin(π) should be ~0")
+    
+    val cosine = Float(0.0).cos()
+    assert((cosine.value - 1.0).abs() < 0.001, "cos(0) should be 1")
+    
+    // Test power and roots
+    val power = Float(2.0).pow(Float(3.0))
+    assert(power.value == 8.0, "pow() failed")
+    
+    val sqrt = Float(16.0).sqrt()
+    assert(sqrt.value == 4.0, "sqrt() failed")
+    
+    // Test logarithms
+    val ln = Float.E.ln()
+    assert((ln.value - 1.0).abs() < 0.001, "ln(e) should be 1")
+    
+    // Test conversions
+    val radians = Float(180.0).toRadians()
+    assert((radians.value - Float.PI.value).abs() < 0.001, "toRadians() failed")
+    
+    val degrees = Float.PI.toDegrees()
+    assert((degrees.value - 180.0).abs() < 0.001, "toDegrees() failed")
+    
+    val intConversion = Float(3.7).toInt()
+    assert(intConversion.value == 3, "toInt() failed")
+    
+    // Test predicates
+    assert(Float(3.14).isFinite().value == true, "isFinite() failed")
+    assert(Float.NaN.isNaN().value == true, "isNaN() failed")
+    assert(Float.POSITIVE_INFINITY.isInfinite().value == true, "isInfinite() failed")
+    
+    // Test operators
+    val sum = Float(1.5) + Float(2.5)
+    assert(sum.value == 4.0, "addition operator failed")
+    
+    val difference = Float(5.0) - Float(2.0)
+    assert(difference.value == 3.0, "subtraction operator failed")
+    
+    // Test min/max
+    val minResult = Float(1.5).min(Float(2.5))
+    assert(minResult.value == 1.5, "min() failed")
+    
+    val maxResult = Float(1.5).max(Float(2.5))
+    assert(maxResult.value == 2.5, "max() failed")
+    
+    // Test clamp
+    val clamped = Float(5.0).clamp(Float(1.0), Float(3.0))
+    assert(clamped.value == 3.0, "clamp() failed")
+    
+    // Test lerp
+    val lerped = Float(0.0).lerp(Float(10.0), Float(0.5))
+    assert(lerped.value == 5.0, "lerp() failed")
+    
+    // Test companion methods
+    val parsed = Float.parse(String("3.14159"))
+    assert((parsed.value - 3.14159).abs() < 0.00001, "parse() failed")
+    
+    println("✓ All Float class tests passed!")
+}
+
+/**
+ * Test suite for Bool class functionality
+ */
+pub fun testBoolClass(): Void {
+    // Test basic construction
+    val truth = Bool(true)
+    val falsehood = Bool(false)
+    assert(truth.value == true, "Bool true construction failed")
+    assert(falsehood.value == false, "Bool false construction failed")
+    
+    // Test string construction
+    val fromStringTrue = Bool("true")
+    val fromStringFalse = Bool("false")
+    assert(fromStringTrue.value == true, "Bool from string 'true' failed")
+    assert(fromStringFalse.value == false, "Bool from string 'false' failed")
+    
+    // Test int construction
+    val fromIntTrue = Bool(Int(1))
+    val fromIntFalse = Bool(Int(0))
+    assert(fromIntTrue.value == true, "Bool from int 1 failed")
+    assert(fromIntFalse.value == false, "Bool from int 0 failed")
+    
+    // Test logical operations
+    val notTrue = truth.not()
+    assert(notTrue.value == false, "not() failed")
+    
+    val andResult = truth.and(falsehood)
+    assert(andResult.value == false, "and() failed")
+    
+    val orResult = truth.or(falsehood)
+    assert(orResult.value == true, "or() failed")
+    
+    val xorResult = truth.xor(falsehood)
+    assert(xorResult.value == true, "xor() failed")
+    
+    val nandResult = truth.nand(falsehood)
+    assert(nandResult.value == true, "nand() failed")
+    
+    val norResult = falsehood.nor(falsehood)
+    assert(norResult.value == true, "nor() failed")
+    
+    val impliesResult = falsehood.implies(truth)
+    assert(impliesResult.value == true, "implies() failed")
+    
+    val iffResult = truth.iff(truth)
+    assert(iffResult.value == true, "iff() failed")
+    
+    // Test conversions
+    val intConversion = truth.toInt()
+    assert(intConversion.value == 1, "toInt() failed")
+    
+    val stringConversion = truth.toString()
+    assert(stringConversion.value == "true", "toString() failed")
+    
+    val customString = truth.toString(String("YES"), String("NO"))
+    assert(customString.value == "YES", "custom toString() failed")
+    
+    // Test conditional execution
+    var executed = false
+    truth.ifTrue(() => { executed = true })
+    assert(executed == true, "ifTrue() failed")
+    
+    executed = false
+    falsehood.ifFalse(() => { executed = true })
+    assert(executed == true, "ifFalse() failed")
+    
+    // Test selection
+    val selected = truth.select(String("A"), String("B"))
+    assert(selected.value == "A", "select() failed")
+    
+    // Test operators
+    val notOp = !truth
+    assert(notOp.value == false, "! operator failed")
+    
+    // Test equality
+    assert(truth.equals(Bool(true)).value == true, "equals() failed")
+    
+    // Test companion methods
+    val parsed = Bool.parse(String("true"))
+    assert(parsed.value == true, "parse() failed")
+    
+    val allTrue = Bool.all(Bool(true), Bool(true), Bool(true))
+    assert(allTrue.value == true, "all() failed")
+    
+    val anyTrue = Bool.any(Bool(false), Bool(true), Bool(false))
+    assert(anyTrue.value == true, "any() failed")
+    
+    val exactlyOneTrue = Bool.exactlyOne(Bool(false), Bool(true), Bool(false))
+    assert(exactlyOneTrue.value == true, "exactlyOne() failed")
+    
+    val majorityTrue = Bool.majority(Bool(true), Bool(true), Bool(false))
+    assert(majorityTrue.value == true, "majority() failed")
+    
+    println("✓ All Bool class tests passed!")
+}
+
+/**
+ * Test suite for String class functionality
+ */
+pub fun testStringClass(): Void {
+    // Test basic construction
+    val text = String("Hello, World!")
+    assert(text.value == "Hello, World!", "String construction failed")
+    
+    // Test basic properties
+    assert(text.length().value == 13, "length() failed")
+    assert(text.isNotEmpty().value == true, "isNotEmpty() failed")
+    
+    // Test searching
+    assert(text.startsWith(String("Hello")).value == true, "startsWith() failed")
+    assert(text.contains(String("World")).value == true, "contains() failed")
+    
+    println("✓ String class tests passed!")
+}
+
+/**
+ * Test suite for Char class functionality
+ */
+pub fun testCharClass(): Void {
+    // Test basic construction
+    val letter = Char('A')
+    assert(letter.value == 'A', "Char construction failed")
+    
+    // Test int construction
+    val fromInt = Char(Int(65))
+    assert(fromInt.value == 'A', "Char from int failed")
+    
+    // Test string construction
+    val fromString = Char(String("B"))
+    assert(fromString.value == 'B', "Char from string failed")
+    
+    // Test conversions
+    val intValue = letter.toInt()
+    assert(intValue.value == 65, "toInt() failed")
+    
+    val stringValue = letter.toString()
+    assert(stringValue.value == "A", "toString() failed")
+    
+    // Test case conversion
+    val lower = letter.toLowerCase()
+    assert(lower.value == 'a', "toLowerCase() failed")
+    
+    val upper = Char('b').toUpperCase()
+    assert(upper.value == 'B', "toUpperCase() failed")
+    
+    val title = Char('c').toTitleCase()
+    assert(title.value == 'C', "toTitleCase() failed")
+    
+    // Test character classification
+    assert(letter.isLetter().value == true, "isLetter() failed")
+    assert(Char('5').isDigit().value == true, "isDigit() failed")
+    assert(letter.isLetterOrDigit().value == true, "isLetterOrDigit() failed")
+    assert(letter.isUpperCase().value == true, "isUpperCase() failed")
+    assert(Char('a').isLowerCase().value == true, "isLowerCase() failed")
+    assert(Char(' ').isWhitespace().value == true, "isWhitespace() failed")
+    assert(Char(' ').isSpaceChar().value == true, "isSpaceChar() failed")
+    assert(Char('\t').isISOControl().value == true, "isISOControl() failed")
+    assert(letter.isPrintable().value == true, "isPrintable() failed")
+    
+    // Test hex digit classification
+    assert(Char('F').isHexDigit().value == true, "isHexDigit() failed for F")
+    assert(Char('9').isHexDigit().value == true, "isHexDigit() failed for 9")
+    assert(Char('g').isHexDigit().value == false, "isHexDigit() should fail for g")
+    
+    // Test ASCII classification
+    assert(letter.isAscii().value == true, "isAscii() failed")
+    
+    // Test vowel/consonant classification
+    assert(Char('a').isVowel().value == true, "isVowel() failed")
+    assert(Char('b').isConsonant().value == true, "isConsonant() failed")
+    
+    // Test numeric value
+    val digitValue = Char('7').getNumericValue()
+    assert(digitValue.value == 7, "getNumericValue() failed")
+    
+    // Test comparison
+    assert(Char('a').compareTo(Char('b')).value < 0, "compareTo() failed")
+    
+    // Test sequence operations
+    val next = Char('a').next()
+    assert(next.value == 'b', "next() failed")
+    
+    val prev = Char('b').prev()
+    assert(prev.value == 'a', "prev() failed")
+    
+    // Test ranges
+    val range = Char('a').rangeTo(Char('e'))
+    assert(range.contains(Char('c')).value == true, "range contains failed")
+    assert(range.size().value == 5, "range size failed")
+    
+    val untilRange = Char('a').until(Char('d'))
+    assert(untilRange.contains(Char('c')).value == true, "until range contains failed")
+    assert(untilRange.size().value == 3, "until range size failed")
+    
+    // Test equality
+    assert(letter.equals(Char('A')).value == true, "equals() failed")
+    
+    // Test companion methods
+    val fromCode = Char.fromInt(Int(66))
+    assert(fromCode.value == 'B', "fromInt() failed")
+    
+    val isValid = Char.isValidCodePoint(Int(65))
+    assert(isValid.value == true, "isValidCodePoint() failed")
+    
+    val minChar = Char.min(Char('a'), Char('b'))
+    assert(minChar.value == 'a', "min() failed")
+    
+    val maxChar = Char.max(Char('a'), Char('b'))
+    assert(maxChar.value == 'b', "max() failed")
+    
+    println("✓ All Char class tests passed!")
+}
+
+/**
+ * Test suite for range functionality
+ */
+pub fun testRanges(): Void {
+    // Test IntRange
+    val intRange = Int(1).rangeTo(Int(10))
+    assert(intRange.contains(Int(5)).value == true, "IntRange contains failed")
+    assert(intRange.isEmpty().value == false, "IntRange isEmpty failed")
+    assert(intRange.size().value == 10, "IntRange size failed")
+    
+    var sum = 0
+    intRange.forEach((i: Int) => { sum = sum + i.value })
+    assert(sum == 55, "IntRange forEach failed")
+    
+    // Test empty range
+    val emptyRange = Int(5).rangeTo(Int(3))
+    assert(emptyRange.isEmpty().value == true, "Empty IntRange detection failed")
+    assert(emptyRange.size().value == 0, "Empty IntRange size failed")
+    
+    // Test CharRange
+    val charRange = Char('a').rangeTo(Char('e'))
+    assert(charRange.contains(Char('c')).value == true, "CharRange contains failed")
+    assert(charRange.size().value == 5, "CharRange size failed")
+    
+    val rangeString = charRange.toString()
+    assert(rangeString.value == "abcde", "CharRange toString failed")
+    
+    println("✓ All Range tests passed!")
+}
+
+/**
+ * Test suite for type conversions and interoperability
+ */
+pub fun testTypeConversions(): Void {
+    // Test Int conversions
+    val intValue = Int(42)
+    val floatFromInt = intValue.toFloat()
+    val stringFromInt = intValue.toString()
+    
+    assert(floatFromInt.value == 42.0, "Int to Float conversion failed")
+    assert(stringFromInt.value == "42", "Int to String conversion failed")
+    
+    // Test Float conversions
+    val floatValue = Float(3.14)
+    val intFromFloat = floatValue.toInt()
+    val stringFromFloat = floatValue.toString()
+    
+    assert(intFromFloat.value == 3, "Float to Int conversion failed")
+    assert(stringFromFloat.contains(String("3.14")).value == true, "Float to String conversion failed")
+    
+    // Test String conversions
+    val stringValue = String("123")
+    val intFromString = stringValue.toInt()
+    val floatFromString = String("3.14").toFloat()
+    val boolFromString = String("true").toBool()
+    
+    assert(intFromString.value == 123, "String to Int conversion failed")
+    assert(floatFromString.value == 3.14, "String to Float conversion failed")
+    assert(boolFromString.value == true, "String to Bool conversion failed")
+    
+    // Test Bool conversions
+    val boolValue = Bool(true)
+    val intFromBool = boolValue.toInt()
+    val stringFromBool = boolValue.toString()
+    
+    assert(intFromBool.value == 1, "Bool to Int conversion failed")
+    assert(stringFromBool.value == "true", "Bool to String conversion failed")
+    
+    // Test Char conversions
+    val charValue = Char('A')
+    val intFromChar = charValue.toInt()
+    val stringFromChar = charValue.toString()
+    
+    assert(intFromChar.value == 65, "Char to Int conversion failed")
+    assert(stringFromChar.value == "A", "Char to String conversion failed")
+    
+    // Test round-trip conversions
+    val original = Int(42)
+    val roundTrip = original.toString().toInt()
+    assert(roundTrip.equals(original).value == true, "Round-trip conversion failed")
+    
+    println("✓ All type conversion tests passed!")
+}
+
+/**
+ * Main test runner that executes all primitive type tests
+ */
+pub fun runAllPrimitiveTests(): Void {
+    println("Running comprehensive primitive type tests...")
+    
+    testIntClass()
+    testFloatClass()
+    testBoolClass()
+    testStringClass()
+    testCharClass()
+    testRanges()
+    testTypeConversions()
+    
+    println("🎉 All primitive type tests completed successfully!")
+}
+
+pub fun runBasicTests(): Void {
+    println("Running basic primitive type tests...")
+    testIntClass()
+    testStringClass()
+    println("🎉 Basic tests completed!")
+}
+
+// Helper function for assertions
+fun assert(condition: Bool, message: String): Void {
+    if (!condition.value) {
+        println("ASSERTION FAILED: " + message)
+    }
+} 

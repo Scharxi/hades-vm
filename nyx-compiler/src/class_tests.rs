@@ -62,7 +62,7 @@ mod tests {
         "#;
 
         let mut parser = Parser::new(source);
-        let program = parser.parse_program();
+        let _program = parser.parse_program();
         
         // Check that class-related tokens are properly tokenized
         let tokens = tokenize(source);
@@ -390,7 +390,7 @@ mod tests {
             }
         "#;
 
-        let mut parser = Parser::new(source);
+        let _parser = Parser::new(source);
         
         // Test that custom class types can be tokenized
         let tokens = tokenize(source);

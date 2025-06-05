@@ -1,0 +1,423 @@
+/**
+ * Character primitive type wrapper class
+ * 
+ * Provides utility methods for character operations, classifications,
+ * and conversions. This class wraps the built-in `char` type
+ * with additional functionality.
+ */
+data class Char(val value: Char) {
+    
+    /**
+     * Creates a new Char instance with the given value
+     * 
+     * @param value The character value to wrap
+     */
+    constructor(value: Char) {
+        this.value = value
+    }
+    
+    /**
+     * Creates a Char from an integer code point
+     * 
+     * @param codePoint The Unicode code point
+     */
+    constructor(codePoint: Int) {
+        this.value = Char.fromInt(codePoint.value)
+    }
+    
+    /**
+     * Creates a Char from a single-character string
+     * 
+     * @param str The string containing a single character
+     * @throws IllegalArgumentException if the string is not exactly one character
+     */
+    constructor(str: String) {
+        if (str.length() != Int(1)) {
+            throw IllegalArgumentException("String must contain exactly one character")
+        }
+        this.value = str.value.charAt(0)
+    }
+    
+    /**
+     * Returns the Unicode code point of this character
+     * 
+     * @return The Unicode code point as an Int
+     */
+    fun toInt(): Int {
+        return Int(this.value.toInt())
+    }
+    
+    /**
+     * Converts this character to a string
+     * 
+     * @return A new String containing this character
+     */
+    override fun toString(): String {
+        return String(this.value.toString())
+    }
+    
+    /**
+     * Converts this character to uppercase
+     * 
+     * @return A new Char in uppercase
+     */
+    fun toUpperCase(): Char {
+        return Char(this.value.toUpperCase())
+    }
+    
+    /**
+     * Converts this character to lowercase
+     * 
+     * @return A new Char in lowercase
+     */
+    fun toLowerCase(): Char {
+        return Char(this.value.toLowerCase())
+    }
+    
+    /**
+     * Converts this character to title case
+     * 
+     * @return A new Char in title case
+     */
+    fun toTitleCase(): Char {
+        return Char(this.value.toTitleCase())
+    }
+    
+    /**
+     * Checks if this character is a letter
+     * 
+     * @return true if this character is a letter, false otherwise
+     */
+    fun isLetter(): Bool {
+        return Bool(this.value.isLetter())
+    }
+    
+    /**
+     * Checks if this character is a digit
+     * 
+     * @return true if this character is a digit, false otherwise
+     */
+    fun isDigit(): Bool {
+        return Bool(this.value.isDigit())
+    }
+    
+    /**
+     * Checks if this character is a letter or digit
+     * 
+     * @return true if this character is a letter or digit, false otherwise
+     */
+    fun isLetterOrDigit(): Bool {
+        return Bool(this.value.isLetterOrDigit())
+    }
+    
+    /**
+     * Checks if this character is uppercase
+     * 
+     * @return true if this character is uppercase, false otherwise
+     */
+    fun isUpperCase(): Bool {
+        return Bool(this.value.isUpperCase())
+    }
+    
+    /**
+     * Checks if this character is lowercase
+     * 
+     * @return true if this character is lowercase, false otherwise
+     */
+    fun isLowerCase(): Bool {
+        return Bool(this.value.isLowerCase())
+    }
+    
+    /**
+     * Checks if this character is title case
+     * 
+     * @return true if this character is title case, false otherwise
+     */
+    fun isTitleCase(): Bool {
+        return Bool(this.value.isTitleCase())
+    }
+    
+    /**
+     * Checks if this character is whitespace
+     * 
+     * @return true if this character is whitespace, false otherwise
+     */
+    fun isWhitespace(): Bool {
+        return Bool(this.value.isWhitespace())
+    }
+    
+    /**
+     * Checks if this character is a space character
+     * 
+     * @return true if this character is a space, false otherwise
+     */
+    fun isSpaceChar(): Bool {
+        return Bool(this.value.isSpaceChar())
+    }
+    
+    /**
+     * Checks if this character is an ISO control character
+     * 
+     * @return true if this character is a control character, false otherwise
+     */
+    fun isISOControl(): Bool {
+        return Bool(this.value.isISOControl())
+    }
+    
+    /**
+     * Checks if this character is a printable character
+     * 
+     * @return true if this character is printable, false otherwise
+     */
+    fun isPrintable(): Bool {
+        return Bool(!this.value.isISOControl())
+    }
+    
+    /**
+     * Checks if this character is a hexadecimal digit (0-9, A-F, a-f)
+     * 
+     * @return true if this character is a hex digit, false otherwise
+     */
+    fun isHexDigit(): Bool {
+        return Bool(
+            (this.value >= '0' && this.value <= '9') ||
+            (this.value >= 'A' && this.value <= 'F') ||
+            (this.value >= 'a' && this.value <= 'f')
+        )
+    }
+    
+    /**
+     * Checks if this character is an ASCII character (0-127)
+     * 
+     * @return true if this character is ASCII, false otherwise
+     */
+    fun isAscii(): Bool {
+        return Bool(this.value.toInt() <= 127)
+    }
+    
+    /**
+     * Checks if this character is a vowel (a, e, i, o, u)
+     * 
+     * @return true if this character is a vowel, false otherwise
+     */
+    fun isVowel(): Bool {
+        val lower = this.toLowerCase().value
+        return Bool(lower == 'a' || lower == 'e' || lower == 'i' || lower == 'o' || lower == 'u')
+    }
+    
+    /**
+     * Checks if this character is a consonant (letter but not vowel)
+     * 
+     * @return true if this character is a consonant, false otherwise
+     */
+    fun isConsonant(): Bool {
+        return Bool(this.isLetter().value && !this.isVowel().value)
+    }
+    
+    /**
+     * Returns the numeric value of this character if it's a digit
+     * 
+     * @return The numeric value, or -1 if not a digit
+     */
+    fun getNumericValue(): Int {
+        return Int(Character.getNumericValue(this.value))
+    }
+    
+    /**
+     * Returns the directionality of this character
+     * 
+     * @return The directionality as an Int
+     */
+    fun getDirectionality(): Int {
+        return Int(Character.getDirectionality(this.value))
+    }
+    
+    /**
+     * Returns the Unicode category of this character
+     * 
+     * @return The Unicode category as an Int
+     */
+    fun getType(): Int {
+        return Int(Character.getType(this.value))
+    }
+    
+    /**
+     * Compares this character with another character
+     * 
+     * @param other The character to compare with
+     * @return An Int indicating the comparison result
+     */
+    operator fun compareTo(other: Char): Int {
+        return Int(this.value.compareTo(other.value))
+    }
+    
+    /**
+     * Returns the next character in Unicode sequence
+     * 
+     * @return A new Char with the next Unicode value
+     */
+    fun next(): Char {
+        return Char(this.value + 1)
+    }
+    
+    /**
+     * Returns the previous character in Unicode sequence
+     * 
+     * @return A new Char with the previous Unicode value
+     */
+    fun prev(): Char {
+        return Char(this.value - 1)
+    }
+    
+    /**
+     * Returns a range from this character to the specified end character
+     * 
+     * @param end The end character of the range
+     * @return A new CharRange
+     */
+    fun rangeTo(end: Char): CharRange {
+        return CharRange(this, end)
+    }
+    
+    /**
+     * Returns a range from this character up to (but not including) the specified end
+     * 
+     * @param end The end character of the range (exclusive)
+     * @return A new CharRange
+     */
+    fun until(end: Char): CharRange {
+        return CharRange(this, Char(end.value - 1))
+    }
+    
+    // Equality
+    override fun equals(other: Any?): Bool {
+        return if (other is Char) Bool(this.value == other.value) else Bool(false)
+    }
+    
+    override fun hashCode(): Int {
+        return Int(this.value.hashCode())
+    }
+    
+    companion object {
+        /** The null character (U+0000) */
+        val NULL: Char = Char('\u0000')
+        
+        /** The space character (U+0020) */
+        val SPACE: Char = Char(' ')
+        
+        /** The tab character (U+0009) */
+        val TAB: Char = Char('\t')
+        
+        /** The newline character (U+000A) */
+        val NEWLINE: Char = Char('\n')
+        
+        /** The carriage return character (U+000D) */
+        val CARRIAGE_RETURN: Char = Char('\r')
+        
+        /** The minimum value a Char can have (U+0000) */
+        val MIN_VALUE: Char = Char('\u0000')
+        
+        /** The maximum value a Char can have (U+FFFF) */
+        val MAX_VALUE: Char = Char('\uFFFF')
+        
+        /**
+         * Creates a Char from an integer code point
+         * 
+         * @param codePoint The Unicode code point
+         * @return A new Char with the specified code point
+         */
+        fun fromInt(codePoint: Int): Char {
+            return Char(codePoint.value.toChar())
+        }
+        
+        /**
+         * Checks if the given code point is a valid character
+         * 
+         * @param codePoint The code point to check
+         * @return true if valid, false otherwise
+         */
+        fun isValidCodePoint(codePoint: Int): Bool {
+            return Bool(codePoint.value >= 0 && codePoint.value <= 0x10FFFF)
+        }
+        
+        /**
+         * Returns the minimum of two characters
+         * 
+         * @param a First character
+         * @param b Second character
+         * @return The smaller character
+         */
+        fun min(a: Char, b: Char): Char {
+            return if (a.value < b.value) a else b
+        }
+        
+        /**
+         * Returns the maximum of two characters
+         * 
+         * @param a First character
+         * @param b Second character
+         * @return The larger character
+         */
+        fun max(a: Char, b: Char): Char {
+            return if (a.value > b.value) a else b
+        }
+    }
+}
+
+/**
+ * Character range class for representing ranges of characters
+ */
+data class CharRange(val start: Char, val endInclusive: Char) {
+    
+    /**
+     * Checks if the given character is contained in this range
+     * 
+     * @param char The character to check
+     * @return true if the character is in the range, false otherwise
+     */
+    fun contains(char: Char): Bool {
+        return Bool(char.value >= start.value && char.value <= endInclusive.value)
+    }
+    
+    /**
+     * Checks if this range is empty
+     * 
+     * @return true if the range is empty, false otherwise
+     */
+    fun isEmpty(): Bool {
+        return Bool(start.value > endInclusive.value)
+    }
+    
+    /**
+     * Returns the size of this range
+     * 
+     * @return The number of characters in the range
+     */
+    fun size(): Int {
+        return if (isEmpty()) Int(0) else Int(endInclusive.value - start.value + 1)
+    }
+    
+    /**
+     * Iterates over each character in the range
+     * 
+     * @param action The action to perform for each character
+     */
+    fun forEach(action: (Char) -> Void): Void {
+        var current = start.value
+        while (current <= endInclusive.value) {
+            action(Char(current))
+            current = (current + 1).toChar()
+        }
+    }
+    
+    /**
+     * Converts this range to a string containing all characters
+     * 
+     * @return A new String containing all characters in the range
+     */
+    fun toString(): String {
+        val builder = StringBuilder()
+        forEach { char -> builder.append(char.value) }
+        return String(builder.toString())
+    }
+} 

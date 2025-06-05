@@ -1,0 +1,425 @@
+/**
+ * Floating-point primitive type wrapper class
+ * 
+ * Provides utility methods for floating-point operations, conversions,
+ * and mathematical functions. This class wraps the built-in `float` type
+ * with additional functionality.
+ */
+data class Float(val value: Float) {
+    
+    /**
+     * Creates a new Float instance with the given value
+     * 
+     * @param value The floating-point value to wrap
+     */
+    constructor(value: Float) {
+        this.value = value
+    }
+    
+    /**
+     * Creates a Float from a string representation
+     * 
+     * @param str The string to parse as a floating-point number
+     * @throws NumberFormatException if the string cannot be parsed
+     */
+    constructor(str: String) {
+        this.value = str.toFloat()
+    }
+    
+    /**
+     * Creates a Float from an integer
+     * 
+     * @param int The integer to convert
+     */
+    constructor(int: Int) {
+        this.value = int.value.toFloat()
+    }
+    
+    /**
+     * Returns the absolute value of this float
+     * 
+     * @return A new Float with the absolute value
+     */
+    fun abs(): Float {
+        return if (this.value < 0.0) Float(-this.value) else this
+    }
+    
+    /**
+     * Returns the sign of this float (-1.0, 0.0, or 1.0)
+     * 
+     * @return -1.0 if negative, 0.0 if zero, 1.0 if positive
+     */
+    fun sign(): Float {
+        return if (this.value < 0.0) Float(-1.0) 
+               else if (this.value > 0.0) Float(1.0) 
+               else Float(0.0)
+    }
+    
+    /**
+     * Rounds this float to the nearest integer
+     * 
+     * @return A new Float with the rounded value
+     */
+    fun round(): Float {
+        return Float(math.round(this.value))
+    }
+    
+    /**
+     * Returns the largest integer value that is less than or equal to this float
+     * 
+     * @return A new Float with the floor value
+     */
+    fun floor(): Float {
+        return Float(math.floor(this.value))
+    }
+    
+    /**
+     * Returns the smallest integer value that is greater than or equal to this float
+     * 
+     * @return A new Float with the ceiling value
+     */
+    fun ceil(): Float {
+        return Float(math.ceil(this.value))
+    }
+    
+    /**
+     * Truncates this float to remove the fractional part
+     * 
+     * @return A new Float with the truncated value
+     */
+    fun truncate(): Float {
+        return Float(math.truncate(this.value))
+    }
+    
+    /**
+     * Raises this float to the power of the given exponent
+     * 
+     * @param exponent The exponent to raise to
+     * @return A new Float with the result of the power operation
+     */
+    fun pow(exponent: Float): Float {
+        return Float(math.pow(this.value, exponent.value))
+    }
+    
+    /**
+     * Returns the square root of this float
+     * 
+     * @return A new Float with the square root
+     */
+    fun sqrt(): Float {
+        return Float(math.sqrt(this.value))
+    }
+    
+    /**
+     * Returns the natural logarithm of this float
+     * 
+     * @return A new Float with the natural logarithm
+     */
+    fun ln(): Float {
+        return Float(math.ln(this.value))
+    }
+    
+    /**
+     * Returns the base-10 logarithm of this float
+     * 
+     * @return A new Float with the base-10 logarithm
+     */
+    fun log10(): Float {
+        return Float(math.log10(this.value))
+    }
+    
+    /**
+     * Returns the logarithm of this float with the specified base
+     * 
+     * @param base The base for the logarithm
+     * @return A new Float with the logarithm
+     */
+    fun log(base: Float): Float {
+        return Float(math.ln(this.value) / math.ln(base.value))
+    }
+    
+    /**
+     * Returns e raised to the power of this float
+     * 
+     * @return A new Float with e^this
+     */
+    fun exp(): Float {
+        return Float(math.exp(this.value))
+    }
+    
+    /**
+     * Returns the sine of this float (in radians)
+     * 
+     * @return A new Float with the sine value
+     */
+    fun sin(): Float {
+        return Float(math.sin(this.value))
+    }
+    
+    /**
+     * Returns the cosine of this float (in radians)
+     * 
+     * @return A new Float with the cosine value
+     */
+    fun cos(): Float {
+        return Float(math.cos(this.value))
+    }
+    
+    /**
+     * Returns the tangent of this float (in radians)
+     * 
+     * @return A new Float with the tangent value
+     */
+    fun tan(): Float {
+        return Float(math.tan(this.value))
+    }
+    
+    /**
+     * Returns the arcsine of this float
+     * 
+     * @return A new Float with the arcsine value in radians
+     */
+    fun asin(): Float {
+        return Float(math.asin(this.value))
+    }
+    
+    /**
+     * Returns the arccosine of this float
+     * 
+     * @return A new Float with the arccosine value in radians
+     */
+    fun acos(): Float {
+        return Float(math.acos(this.value))
+    }
+    
+    /**
+     * Returns the arctangent of this float
+     * 
+     * @return A new Float with the arctangent value in radians
+     */
+    fun atan(): Float {
+        return Float(math.atan(this.value))
+    }
+    
+    /**
+     * Returns the two-argument arctangent of y (this) and x
+     * 
+     * @param x The x coordinate
+     * @return A new Float with the arctangent value in radians
+     */
+    fun atan2(x: Float): Float {
+        return Float(math.atan2(this.value, x.value))
+    }
+    
+    /**
+     * Converts this float to radians from degrees
+     * 
+     * @return A new Float with the value in radians
+     */
+    fun toRadians(): Float {
+        return Float(this.value * PI / 180.0)
+    }
+    
+    /**
+     * Converts this float to degrees from radians
+     * 
+     * @return A new Float with the value in degrees
+     */
+    fun toDegrees(): Float {
+        return Float(this.value * 180.0 / PI)
+    }
+    
+    /**
+     * Checks if this float is NaN (Not a Number)
+     * 
+     * @return true if NaN, false otherwise
+     */
+    fun isNaN(): Bool {
+        return Bool(this.value.isNaN())
+    }
+    
+    /**
+     * Checks if this float is infinite
+     * 
+     * @return true if infinite, false otherwise
+     */
+    fun isInfinite(): Bool {
+        return Bool(this.value.isInfinite())
+    }
+    
+    /**
+     * Checks if this float is finite (not NaN or infinite)
+     * 
+     * @return true if finite, false otherwise
+     */
+    fun isFinite(): Bool {
+        return Bool(this.value.isFinite())
+    }
+    
+    /**
+     * Converts this float to an Int (truncating the fractional part)
+     * 
+     * @return A new Int with the truncated value
+     */
+    fun toInt(): Int {
+        return Int(this.value.toInt())
+    }
+    
+    /**
+     * Converts this float to a String
+     * 
+     * @return A new String representation of this float
+     */
+    override fun toString(): String {
+        return String(this.value.toString())
+    }
+    
+    /**
+     * Converts this float to a String with the specified number of decimal places
+     * 
+     * @param decimalPlaces The number of decimal places to show
+     * @return A new String representation with fixed decimal places
+     */
+    fun toString(decimalPlaces: Int): String {
+        return String(this.value.toString(decimalPlaces.value))
+    }
+    
+    /**
+     * Returns the minimum of this float and the other
+     * 
+     * @param other The other float
+     * @return A new Float with the minimum value
+     */
+    fun min(other: Float): Float {
+        return if (this.value < other.value) this else other
+    }
+    
+    /**
+     * Returns the maximum of this float and the other
+     * 
+     * @param other The other float
+     * @return A new Float with the maximum value
+     */
+    fun max(other: Float): Float {
+        return if (this.value > other.value) this else other
+    }
+    
+    /**
+     * Clamps this float between the given minimum and maximum values
+     * 
+     * @param min The minimum value
+     * @param max The maximum value
+     * @return A new Float clamped to the range [min, max]
+     */
+    fun clamp(min: Float, max: Float): Float {
+        return this.max(min).min(max)
+    }
+    
+    /**
+     * Linearly interpolates between this float and the other
+     * 
+     * @param other The target value
+     * @param t The interpolation factor (0.0 to 1.0)
+     * @return A new Float with the interpolated value
+     */
+    fun lerp(other: Float, t: Float): Float {
+        return Float(this.value + t.value * (other.value - this.value))
+    }
+    
+    // Arithmetic operators
+    operator fun plus(other: Float): Float = Float(this.value + other.value)
+    operator fun minus(other: Float): Float = Float(this.value - other.value)
+    operator fun times(other: Float): Float = Float(this.value * other.value)
+    operator fun div(other: Float): Float = Float(this.value / other.value)
+    operator fun rem(other: Float): Float = Float(this.value % other.value)
+    operator fun unaryMinus(): Float = Float(-this.value)
+    operator fun unaryPlus(): Float = this
+    
+    // Comparison operators
+    operator fun compareTo(other: Float): Int = Int(this.value.compareTo(other.value))
+    
+    // Equality
+    override fun equals(other: Any?): Bool {
+        return if (other is Float) Bool(this.value == other.value) else Bool(false)
+    }
+    
+    override fun hashCode(): Int {
+        return Int(this.value.hashCode())
+    }
+    
+    companion object {
+        /** The maximum finite value a Float can have */
+        val MAX_VALUE: Float = Float(3.4028235e38f)
+        
+        /** The minimum positive normal value a Float can have */
+        val MIN_VALUE: Float = Float(1.4e-45f)
+        
+        /** Positive infinity */
+        val POSITIVE_INFINITY: Float = Float(1.0f / 0.0f)
+        
+        /** Negative infinity */
+        val NEGATIVE_INFINITY: Float = Float(-1.0f / 0.0f)
+        
+        /** Not a Number */
+        val NaN: Float = Float(0.0f / 0.0f)
+        
+        /** The mathematical constant pi */
+        val PI: Float = Float(3.14159265358979323846f)
+        
+        /** The mathematical constant e */
+        val E: Float = Float(2.71828182845904523536f)
+        
+        /** The value 0.0 */
+        val ZERO: Float = Float(0.0f)
+        
+        /** The value 1.0 */
+        val ONE: Float = Float(1.0f)
+        
+        /**
+         * Parses a string as a float
+         * 
+         * @param str The string to parse
+         * @return A new Float with the parsed value
+         * @throws NumberFormatException if the string cannot be parsed
+         */
+        fun parse(str: String): Float {
+            return Float(str.toFloat())
+        }
+        
+        /**
+         * Tries to parse a string as a float, returning null if it fails
+         * 
+         * @param str The string to parse
+         * @return A new Float with the parsed value, or null if parsing fails
+         */
+        fun tryParse(str: String): Float? {
+            return try {
+                Float(str.toFloat())
+            } catch (e: NumberFormatException) {
+                null
+            }
+        }
+        
+        /**
+         * Returns the smaller of two float values
+         * 
+         * @param a First value
+         * @param b Second value
+         * @return The smaller value
+         */
+        fun min(a: Float, b: Float): Float {
+            return if (a.value < b.value) a else b
+        }
+        
+        /**
+         * Returns the larger of two float values
+         * 
+         * @param a First value
+         * @param b Second value
+         * @return The larger value
+         */
+        fun max(a: Float, b: Float): Float {
+            return if (a.value > b.value) a else b
+        }
+    }
+} 

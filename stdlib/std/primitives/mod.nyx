@@ -1,0 +1,23 @@
+/**
+ * Primitive Types Module for Nyx Standard Library
+ * 
+ * This module contains class-based wrappers and utilities for primitive types
+ * including Int, Float, Bool, and String. These classes provide methods for
+ * common operations, conversions, and utilities.
+ * 
+ * Example usage:
+ * ```nyx
+ * import std.primitives.Int
+ * import std.primitives.String
+ * 
+ * val number = Int(42)
+ * val text = String("Hello")
+ * ```
+ */
+
+// Re-export all primitive type classes
+pub use int::Int
+pub use float::Float  
+pub use bool::Bool
+pub use string::String
+pub use char::Char 

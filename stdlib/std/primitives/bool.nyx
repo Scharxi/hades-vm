@@ -1,0 +1,311 @@
+/**
+ * Boolean primitive type wrapper class
+ * 
+ * Provides utility methods for boolean operations and conversions.
+ * This class wraps the built-in `bool` type with additional functionality.
+ */
+data class Bool(val value: Bool) {
+    
+    /**
+     * Creates a new Bool instance with the given value
+     * 
+     * @param value The boolean value to wrap
+     */
+    constructor(value: Bool) {
+        this.value = value
+    }
+    
+    /**
+     * Creates a Bool from a string representation
+     * 
+     * @param str The string to parse as a boolean ("true" or "false")
+     * @throws IllegalArgumentException if the string is not "true" or "false"
+     */
+    constructor(str: String) {
+        this.value = when (str.toLowerCase()) {
+            "true" -> true
+            "false" -> false
+            else -> throw IllegalArgumentException("Invalid boolean string: $str")
+        }
+    }
+    
+    /**
+     * Creates a Bool from an integer (0 = false, non-zero = true)
+     * 
+     * @param int The integer to convert
+     */
+    constructor(int: Int) {
+        this.value = int.value != 0
+    }
+    
+    /**
+     * Returns the logical NOT of this boolean
+     * 
+     * @return A new Bool with the negated value
+     */
+    fun not(): Bool {
+        return Bool(!this.value)
+    }
+    
+    /**
+     * Returns the logical AND of this boolean and the other
+     * 
+     * @param other The other boolean
+     * @return A new Bool with the result of the AND operation
+     */
+    fun and(other: Bool): Bool {
+        return Bool(this.value && other.value)
+    }
+    
+    /**
+     * Returns the logical OR of this boolean and the other
+     * 
+     * @param other The other boolean
+     * @return A new Bool with the result of the OR operation
+     */
+    fun or(other: Bool): Bool {
+        return Bool(this.value || other.value)
+    }
+    
+    /**
+     * Returns the logical XOR of this boolean and the other
+     * 
+     * @param other The other boolean
+     * @return A new Bool with the result of the XOR operation
+     */
+    fun xor(other: Bool): Bool {
+        return Bool(this.value != other.value)
+    }
+    
+    /**
+     * Returns the logical NAND of this boolean and the other
+     * 
+     * @param other The other boolean
+     * @return A new Bool with the result of the NAND operation
+     */
+    fun nand(other: Bool): Bool {
+        return Bool(!(this.value && other.value))
+    }
+    
+    /**
+     * Returns the logical NOR of this boolean and the other
+     * 
+     * @param other The other boolean
+     * @return A new Bool with the result of the NOR operation
+     */
+    fun nor(other: Bool): Bool {
+        return Bool(!(this.value || other.value))
+    }
+    
+    /**
+     * Returns the logical implication (this -> other)
+     * 
+     * @param other The consequent boolean
+     * @return A new Bool with the result of the implication
+     */
+    fun implies(other: Bool): Bool {
+        return Bool(!this.value || other.value)
+    }
+    
+    /**
+     * Returns the logical equivalence (this <-> other)
+     * 
+     * @param other The other boolean
+     * @return A new Bool with the result of the equivalence
+     */
+    fun iff(other: Bool): Bool {
+        return Bool(this.value == other.value)
+    }
+    
+    /**
+     * Converts this boolean to an Int (false = 0, true = 1)
+     * 
+     * @return A new Int with the converted value
+     */
+    fun toInt(): Int {
+        return Int(if (this.value) 1 else 0)
+    }
+    
+    /**
+     * Converts this boolean to a String
+     * 
+     * @return A new String representation of this boolean
+     */
+    override fun toString(): String {
+        return String(this.value.toString())
+    }
+    
+    /**
+     * Converts this boolean to a String with custom true/false representations
+     * 
+     * @param trueString The string to use for true
+     * @param falseString The string to use for false
+     * @return A new String with the custom representation
+     */
+    fun toString(trueString: String, falseString: String): String {
+        return String(if (this.value) trueString else falseString)
+    }
+    
+    /**
+     * Executes the given action if this boolean is true
+     * 
+     * @param action The action to execute if true
+     * @return This Bool instance for chaining
+     */
+    fun ifTrue(action: () -> Void): Bool {
+        if (this.value) {
+            action()
+        }
+        return this
+    }
+    
+    /**
+     * Executes the given action if this boolean is false
+     * 
+     * @param action The action to execute if false
+     * @return This Bool instance for chaining
+     */
+    fun ifFalse(action: () -> Void): Bool {
+        if (!this.value) {
+            action()
+        }
+        return this
+    }
+    
+    /**
+     * Executes one of two actions based on this boolean value
+     * 
+     * @param trueAction The action to execute if true
+     * @param falseAction The action to execute if false
+     * @return This Bool instance for chaining
+     */
+    fun ifElse(trueAction: () -> Void, falseAction: () -> Void): Bool {
+        if (this.value) {
+            trueAction()
+        } else {
+            falseAction()
+        }
+        return this
+    }
+    
+    /**
+     * Returns a value based on this boolean condition
+     * 
+     * @param trueValue The value to return if true
+     * @param falseValue The value to return if false
+     * @return The selected value
+     */
+    fun <T> select(trueValue: T, falseValue: T): T {
+        return if (this.value) trueValue else falseValue
+    }
+    
+    // Logical operators
+    operator fun not(): Bool = Bool(!this.value)
+    
+    // Equality
+    override fun equals(other: Any?): Bool {
+        return if (other is Bool) Bool(this.value == other.value) else Bool(false)
+    }
+    
+    override fun hashCode(): Int {
+        return Int(this.value.hashCode())
+    }
+    
+    companion object {
+        /** The value true */
+        val TRUE: Bool = Bool(true)
+        
+        /** The value false */
+        val FALSE: Bool = Bool(false)
+        
+        /**
+         * Parses a string as a boolean
+         * 
+         * @param str The string to parse ("true" or "false", case-insensitive)
+         * @return A new Bool with the parsed value
+         * @throws IllegalArgumentException if the string is not a valid boolean
+         */
+        fun parse(str: String): Bool {
+            return Bool(str)
+        }
+        
+        /**
+         * Tries to parse a string as a boolean, returning null if it fails
+         * 
+         * @param str The string to parse
+         * @return A new Bool with the parsed value, or null if parsing fails
+         */
+        fun tryParse(str: String): Bool? {
+            return try {
+                Bool(str)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+        }
+        
+        /**
+         * Returns the logical AND of all the given boolean values
+         * 
+         * @param values The boolean values to AND together
+         * @return A new Bool with the result of the AND operation
+         */
+        fun all(vararg values: Bool): Bool {
+            for (value in values) {
+                if (!value.value) {
+                    return Bool(false)
+                }
+            }
+            return Bool(true)
+        }
+        
+        /**
+         * Returns the logical OR of all the given boolean values
+         * 
+         * @param values The boolean values to OR together
+         * @return A new Bool with the result of the OR operation
+         */
+        fun any(vararg values: Bool): Bool {
+            for (value in values) {
+                if (value.value) {
+                    return Bool(true)
+                }
+            }
+            return Bool(false)
+        }
+        
+        /**
+         * Returns true if exactly one of the given boolean values is true
+         * 
+         * @param values The boolean values to check
+         * @return A new Bool indicating if exactly one value is true
+         */
+        fun exactlyOne(vararg values: Bool): Bool {
+            var count = 0
+            for (value in values) {
+                if (value.value) {
+                    count++
+                    if (count > 1) {
+                        return Bool(false)
+                    }
+                }
+            }
+            return Bool(count == 1)
+        }
+        
+        /**
+         * Returns the majority value of the given boolean values
+         * 
+         * @param values The boolean values to check
+         * @return A new Bool with the majority value (true if tie)
+         */
+        fun majority(vararg values: Bool): Bool {
+            var trueCount = 0
+            for (value in values) {
+                if (value.value) {
+                    trueCount++
+                }
+            }
+            return Bool(trueCount * 2 >= values.size)
+        }
+    }
+} 

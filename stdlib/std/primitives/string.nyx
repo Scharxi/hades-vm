@@ -1,0 +1,508 @@
+/**
+ * String primitive type wrapper class
+ * 
+ * Provides utility methods for string operations, manipulations,
+ * and conversions. This class wraps the built-in `string` type
+ * with additional functionality.
+ */
+data class String(val value: String) {
+    
+    /**
+     * Creates a new String instance with the given value
+     * 
+     * @param value The string value to wrap
+     */
+    constructor(value: String) {
+        this.value = value
+    }
+    
+    /**
+     * Creates a String from a character repeated the specified number of times
+     * 
+     * @param char The character to repeat
+     * @param count The number of times to repeat
+     */
+    constructor(char: Char, count: Int) {
+        this.value = char.toString().repeat(count.value)
+    }
+    
+    /**
+     * Creates a String from an array of characters
+     * 
+     * @param chars The array of characters
+     */
+    constructor(chars: Array<Char>) {
+        this.value = chars.joinToString("")
+    }
+    
+    /**
+     * Returns the length of this string
+     * 
+     * @return The number of characters in the string
+     */
+    fun length(): Int {
+        return Int(this.value.length)
+    }
+    
+    /**
+     * Checks if this string is empty
+     * 
+     * @return true if the string has no characters, false otherwise
+     */
+    fun isEmpty(): Bool {
+        return Bool(this.value.isEmpty())
+    }
+    
+    /**
+     * Checks if this string is not empty
+     * 
+     * @return true if the string has characters, false otherwise
+     */
+    fun isNotEmpty(): Bool {
+        return Bool(!this.value.isEmpty())
+    }
+    
+    /**
+     * Checks if this string is blank (empty or contains only whitespace)
+     * 
+     * @return true if blank, false otherwise
+     */
+    fun isBlank(): Bool {
+        return Bool(this.value.trim().isEmpty())
+    }
+    
+    /**
+     * Checks if this string is not blank
+     * 
+     * @return true if not blank, false otherwise
+     */
+    fun isNotBlank(): Bool {
+        return Bool(!this.value.trim().isEmpty())
+    }
+    
+    /**
+     * Returns the character at the specified index
+     * 
+     * @param index The index of the character
+     * @return The character at the specified index
+     * @throws IndexOutOfBoundsException if the index is out of bounds
+     */
+    fun charAt(index: Int): Char {
+        return Char(this.value.charAt(index.value))
+    }
+    
+    /**
+     * Returns the character at the specified index (operator form)
+     * 
+     * @param index The index of the character
+     * @return The character at the specified index
+     */
+    operator fun get(index: Int): Char {
+        return charAt(index)
+    }
+    
+    /**
+     * Returns a substring from the start index to the end of the string
+     * 
+     * @param startIndex The starting index (inclusive)
+     * @return A new String containing the substring
+     */
+    fun substring(startIndex: Int): String {
+        return String(this.value.substring(startIndex.value))
+    }
+    
+    /**
+     * Returns a substring from the start index to the end index
+     * 
+     * @param startIndex The starting index (inclusive)
+     * @param endIndex The ending index (exclusive)
+     * @return A new String containing the substring
+     */
+    fun substring(startIndex: Int, endIndex: Int): String {
+        return String(this.value.substring(startIndex.value, endIndex.value))
+    }
+    
+    /**
+     * Concatenates this string with another string
+     * 
+     * @param other The string to concatenate
+     * @return A new String containing the concatenated result
+     */
+    fun concat(other: String): String {
+        return String(this.value + other.value)
+    }
+    
+    /**
+     * Concatenates this string with another string (operator form)
+     * 
+     * @param other The string to concatenate
+     * @return A new String containing the concatenated result
+     */
+    operator fun plus(other: String): String {
+        return concat(other)
+    }
+    
+    /**
+     * Converts this string to uppercase
+     * 
+     * @return A new String in uppercase
+     */
+    fun toUpperCase(): String {
+        return String(this.value.toUpperCase())
+    }
+    
+    /**
+     * Converts this string to lowercase
+     * 
+     * @return A new String in lowercase
+     */
+    fun toLowerCase(): String {
+        return String(this.value.toLowerCase())
+    }
+    
+    /**
+     * Capitalizes the first character of this string
+     * 
+     * @return A new String with the first character capitalized
+     */
+    fun capitalize(): String {
+        return if (this.isEmpty()) {
+            this
+        } else {
+            String(this.value.charAt(0).toUpperCase() + this.value.substring(1))
+        }
+    }
+    
+    /**
+     * Decapitalizes the first character of this string
+     * 
+     * @return A new String with the first character in lowercase
+     */
+    fun decapitalize(): String {
+        return if (this.isEmpty()) {
+            this
+        } else {
+            String(this.value.charAt(0).toLowerCase() + this.value.substring(1))
+        }
+    }
+    
+    /**
+     * Removes leading and trailing whitespace
+     * 
+     * @return A new String with whitespace trimmed
+     */
+    fun trim(): String {
+        return String(this.value.trim())
+    }
+    
+    /**
+     * Removes leading whitespace
+     * 
+     * @return A new String with leading whitespace removed
+     */
+    fun trimStart(): String {
+        return String(this.value.trimStart())
+    }
+    
+    /**
+     * Removes trailing whitespace
+     * 
+     * @return A new String with trailing whitespace removed
+     */
+    fun trimEnd(): String {
+        return String(this.value.trimEnd())
+    }
+    
+    /**
+     * Checks if this string starts with the specified prefix
+     * 
+     * @param prefix The prefix to check for
+     * @return true if the string starts with the prefix, false otherwise
+     */
+    fun startsWith(prefix: String): Bool {
+        return Bool(this.value.startsWith(prefix.value))
+    }
+    
+    /**
+     * Checks if this string ends with the specified suffix
+     * 
+     * @param suffix The suffix to check for
+     * @return true if the string ends with the suffix, false otherwise
+     */
+    fun endsWith(suffix: String): Bool {
+        return Bool(this.value.endsWith(suffix.value))
+    }
+    
+    /**
+     * Checks if this string contains the specified substring
+     * 
+     * @param substring The substring to search for
+     * @return true if the substring is found, false otherwise
+     */
+    fun contains(substring: String): Bool {
+        return Bool(this.value.contains(substring.value))
+    }
+    
+    /**
+     * Returns the index of the first occurrence of the specified substring
+     * 
+     * @param substring The substring to search for
+     * @return The index of the first occurrence, or -1 if not found
+     */
+    fun indexOf(substring: String): Int {
+        return Int(this.value.indexOf(substring.value))
+    }
+    
+    /**
+     * Returns the index of the first occurrence of the specified substring, starting from the given index
+     * 
+     * @param substring The substring to search for
+     * @param startIndex The index to start searching from
+     * @return The index of the first occurrence, or -1 if not found
+     */
+    fun indexOf(substring: String, startIndex: Int): Int {
+        return Int(this.value.indexOf(substring.value, startIndex.value))
+    }
+    
+    /**
+     * Returns the index of the last occurrence of the specified substring
+     * 
+     * @param substring The substring to search for
+     * @return The index of the last occurrence, or -1 if not found
+     */
+    fun lastIndexOf(substring: String): Int {
+        return Int(this.value.lastIndexOf(substring.value))
+    }
+    
+    /**
+     * Replaces all occurrences of the target string with the replacement string
+     * 
+     * @param target The string to replace
+     * @param replacement The replacement string
+     * @return A new String with replacements made
+     */
+    fun replace(target: String, replacement: String): String {
+        return String(this.value.replace(target.value, replacement.value))
+    }
+    
+    /**
+     * Replaces the first occurrence of the target string with the replacement string
+     * 
+     * @param target The string to replace
+     * @param replacement The replacement string
+     * @return A new String with the first replacement made
+     */
+    fun replaceFirst(target: String, replacement: String): String {
+        return String(this.value.replaceFirst(target.value, replacement.value))
+    }
+    
+    /**
+     * Splits this string into an array using the specified delimiter
+     * 
+     * @param delimiter The delimiter to split on
+     * @return An array of String parts
+     */
+    fun split(delimiter: String): Array<String> {
+        val parts = this.value.split(delimiter.value)
+        return Array(parts.map { String(it) })
+    }
+    
+    /**
+     * Splits this string into an array using the specified delimiter with a limit
+     * 
+     * @param delimiter The delimiter to split on
+     * @param limit The maximum number of parts to return
+     * @return An array of String parts
+     */
+    fun split(delimiter: String, limit: Int): Array<String> {
+        val parts = this.value.split(delimiter.value, limit.value)
+        return Array(parts.map { String(it) })
+    }
+    
+    /**
+     * Repeats this string the specified number of times
+     * 
+     * @param count The number of times to repeat
+     * @return A new String with the repetitions
+     */
+    fun repeat(count: Int): String {
+        return String(this.value.repeat(count.value))
+    }
+    
+    /**
+     * Reverses this string
+     * 
+     * @return A new String with characters in reverse order
+     */
+    fun reverse(): String {
+        return String(this.value.reverse())
+    }
+    
+    /**
+     * Pads this string on the left with the specified character to reach the target length
+     * 
+     * @param targetLength The desired length
+     * @param padChar The character to pad with
+     * @return A new String padded to the target length
+     */
+    fun padStart(targetLength: Int, padChar: Char): String {
+        return String(this.value.padStart(targetLength.value, padChar.value))
+    }
+    
+    /**
+     * Pads this string on the right with the specified character to reach the target length
+     * 
+     * @param targetLength The desired length
+     * @param padChar The character to pad with
+     * @return A new String padded to the target length
+     */
+    fun padEnd(targetLength: Int, padChar: Char): String {
+        return String(this.value.padEnd(targetLength.value, padChar.value))
+    }
+    
+    /**
+     * Converts this string to an integer
+     * 
+     * @return A new Int with the parsed value
+     * @throws NumberFormatException if the string cannot be parsed
+     */
+    fun toInt(): Int {
+        return Int(this.value.toInt())
+    }
+    
+    /**
+     * Converts this string to a float
+     * 
+     * @return A new Float with the parsed value
+     * @throws NumberFormatException if the string cannot be parsed
+     */
+    fun toFloat(): Float {
+        return Float(this.value.toFloat())
+    }
+    
+    /**
+     * Converts this string to a boolean
+     * 
+     * @return A new Bool with the parsed value
+     * @throws IllegalArgumentException if the string is not "true" or "false"
+     */
+    fun toBool(): Bool {
+        return Bool(this.value)
+    }
+    
+    /**
+     * Converts this string to a character array
+     * 
+     * @return An array of characters
+     */
+    fun toCharArray(): Array<Char> {
+        return Array(this.value.toCharArray().map { Char(it) })
+    }
+    
+    /**
+     * Returns a hash code for this string
+     * 
+     * @return The hash code
+     */
+    override fun hashCode(): Int {
+        return Int(this.value.hashCode())
+    }
+    
+    /**
+     * Returns this string (identity function)
+     * 
+     * @return This string
+     */
+    override fun toString(): String {
+        return this
+    }
+    
+    // Equality
+    override fun equals(other: Any?): Bool {
+        return if (other is String) Bool(this.value == other.value) else Bool(false)
+    }
+    
+    /**
+     * Compares this string with another string lexicographically
+     * 
+     * @param other The string to compare with
+     * @return An Int indicating the comparison result
+     */
+    operator fun compareTo(other: String): Int {
+        return Int(this.value.compareTo(other.value))
+    }
+    
+    companion object {
+        /** An empty string */
+        val EMPTY: String = String("")
+        
+        /**
+         * Joins an array of strings with the specified separator
+         * 
+         * @param strings The strings to join
+         * @param separator The separator to use
+         * @return A new String with the joined result
+         */
+        fun join(strings: Array<String>, separator: String): String {
+            return String(strings.map { it.value }.joinToString(separator.value))
+        }
+        
+        /**
+         * Joins an array of strings with the specified separator and transforms
+         * 
+         * @param strings The strings to join
+         * @param separator The separator to use
+         * @param prefix The prefix to add
+         * @param suffix The suffix to add
+         * @return A new String with the joined result
+         */
+        fun join(strings: Array<String>, separator: String, prefix: String, suffix: String): String {
+            return String(prefix.value + strings.map { it.value }.joinToString(separator.value) + suffix.value)
+        }
+        
+        /**
+         * Creates a string with the specified character repeated the given number of times
+         * 
+         * @param char The character to repeat
+         * @param count The number of repetitions
+         * @return A new String with the repeated character
+         */
+        fun repeat(char: Char, count: Int): String {
+            return String(char.toString().repeat(count.value))
+        }
+        
+        /**
+         * Formats a string with the given arguments (placeholder implementation)
+         * 
+         * @param format The format string
+         * @param args The arguments to format
+         * @return A new String with the formatted result
+         */
+        fun format(format: String, vararg args: Any): String {
+            // Placeholder implementation - would need proper string formatting
+            return format
+        }
+        
+        /**
+         * Compares two strings lexicographically, ignoring case differences
+         * 
+         * @param a First string
+         * @param b Second string
+         * @return An Int indicating the comparison result
+         */
+        fun compareIgnoreCase(a: String, b: String): Int {
+            return Int(a.value.toLowerCase().compareTo(b.value.toLowerCase()))
+        }
+        
+        /**
+         * Checks if two strings are equal, ignoring case differences
+         * 
+         * @param a First string
+         * @param b Second string
+         * @return true if equal ignoring case, false otherwise
+         */
+        fun equalsIgnoreCase(a: String, b: String): Bool {
+            return Bool(a.value.toLowerCase() == b.value.toLowerCase())
+        }
+    }
+} 
