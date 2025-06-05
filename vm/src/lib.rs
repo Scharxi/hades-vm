@@ -30,4 +30,5 @@ pub mod alu;
 pub mod instruction_processor;
 pub mod instruction; 
 pub mod memory; 
-pub mod opcode; 
+pub mod opcode;
+pub mod primitive_ops; 

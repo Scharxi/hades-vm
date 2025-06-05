@@ -339,9 +339,8 @@ impl CodeGenerator {
                 Ok(IRValue::undefined(IRType::i32()))
             }
             
-            Expression::MethodCall { object: _, method: _, arguments: _ } => {
-                // TODO: Implement method calls
-                Ok(IRValue::undefined(IRType::i32()))
+            Expression::MethodCall { object, method, arguments } => {
+                self.generate_method_call(object, method, arguments, ir_function)
             }
             
             Expression::This => {
@@ -370,6 +369,177 @@ impl CodeGenerator {
             Type::Class(_) => IRType::pointer(IRType::void()), // Placeholder for class types
             Type::Generic { .. } => IRType::pointer(IRType::void()), // Placeholder for generic types
         }
+    }
+
+    fn generate_method_call(
+        &mut self,
+        object: &Expression,
+        method: &str,
+        arguments: &[Expression],
+        ir_function: &mut IRFunction,
+    ) -> CodeGenResult<IRValue> {
+        let object_value = self.generate_expression(object, ir_function)?;
+        let object_type = object_value.ty().ok_or_else(|| CodeGenError {
+            message: "Object has no type for method call".to_string()
+        })?;
+
+        // Generate arguments
+        let mut arg_values = vec![object_value.clone()]; // 'this' parameter
+        for arg in arguments {
+            arg_values.push(self.generate_expression(arg, ir_function)?);
+        }
+
+        let entry_block = ir_function.find_basic_block_by_name_mut("entry")
+            .ok_or_else(|| CodeGenError { message: "Entry block not found".to_string() })?;
+
+        // Generate method call based on primitive type
+        match &*object_type {
+            hades_ir::Type::Integer(_) => {
+                self.generate_int_method_call(method, arg_values, entry_block)
+            }
+            hades_ir::Type::Float(_) => {
+                self.generate_float_method_call(method, arg_values, entry_block)
+            }
+            hades_ir::Type::Boolean => {
+                self.generate_bool_method_call(method, arg_values, entry_block)
+            }
+            hades_ir::Type::String => {
+                self.generate_string_method_call(method, arg_values, entry_block)
+            }
+            _ => {
+                // For other types, generate a placeholder call
+                let inst = IRInstruction::call(
+                    IRValue::undefined(IRType::void()),
+                    arg_values,
+                    Some(IRType::i32()),
+                );
+                let inst_id = inst.id();
+                entry_block.add_instruction(inst);
+                
+                Ok(IRValue::Instruction {
+                    id: inst_id,
+                    ty: IRType::i32(),
+                })
+            }
+        }
+    }
+
+    fn generate_int_method_call(
+        &self,
+        method: &str,
+        arg_values: Vec<IRValue>,
+        entry_block: &mut hades_ir::BasicBlock,
+    ) -> CodeGenResult<IRValue> {
+        let return_type = match method {
+            "abs" | "sign" | "pow" => IRType::i32(),
+            "isEven" | "isOdd" | "isPrime" => IRType::boolean(),
+            "toFloat" => IRType::f32(),
+            "toString" => IRType::string(),
+            _ => return Err(CodeGenError {
+                message: format!("Unknown Int method: {}", method),
+            }),
+        };
+
+        // Generate call for primitive method (using placeholder function)
+        let function_value = IRValue::function(
+            &format!("int.{}", method),
+            IRType::function(return_type.clone(), vec![], false),
+        );
+        let inst = IRInstruction::call(function_value, arg_values, Some(return_type.clone()));
+        let inst_id = inst.id();
+        entry_block.add_instruction(inst);
+
+        Ok(IRValue::Instruction {
+            id: inst_id,
+            ty: return_type,
+        })
+    }
+
+    fn generate_float_method_call(
+        &self,
+        method: &str,
+        arg_values: Vec<IRValue>,
+        entry_block: &mut hades_ir::BasicBlock,
+    ) -> CodeGenResult<IRValue> {
+        let return_type = match method {
+            "abs" | "sin" | "cos" | "tan" | "sqrt" | "ln" | "log" | "exp" => IRType::f32(),
+            "round" | "floor" | "ceil" | "toInt" => IRType::i32(),
+            "isNaN" | "isInfinite" => IRType::boolean(),
+            "toString" => IRType::string(),
+            _ => return Err(CodeGenError {
+                message: format!("Unknown Float method: {}", method),
+            }),
+        };
+
+        let function_value = IRValue::function(
+            &format!("float.{}", method),
+            IRType::function(return_type.clone(), vec![], false),
+        );
+        let inst = IRInstruction::call(function_value, arg_values, Some(return_type.clone()));
+        let inst_id = inst.id();
+        entry_block.add_instruction(inst);
+
+        Ok(IRValue::Instruction {
+            id: inst_id,
+            ty: return_type,
+        })
+    }
+
+    fn generate_bool_method_call(
+        &self,
+        method: &str,
+        arg_values: Vec<IRValue>,
+        entry_block: &mut hades_ir::BasicBlock,
+    ) -> CodeGenResult<IRValue> {
+        let return_type = match method {
+            "and" | "or" | "xor" | "not" => IRType::boolean(),
+            "toString" => IRType::string(),
+            _ => return Err(CodeGenError {
+                message: format!("Unknown Bool method: {}", method),
+            }),
+        };
+
+        let function_value = IRValue::function(
+            &format!("bool.{}", method),
+            IRType::function(return_type.clone(), vec![], false),
+        );
+        let inst = IRInstruction::call(function_value, arg_values, Some(return_type.clone()));
+        let inst_id = inst.id();
+        entry_block.add_instruction(inst);
+
+        Ok(IRValue::Instruction {
+            id: inst_id,
+            ty: return_type,
+        })
+    }
+
+    fn generate_string_method_call(
+        &self,
+        method: &str,
+        arg_values: Vec<IRValue>,
+        entry_block: &mut hades_ir::BasicBlock,
+    ) -> CodeGenResult<IRValue> {
+        let return_type = match method {
+            "length" | "indexOf" => IRType::i32(),
+            "substring" | "concat" | "toLowerCase" | "toUpperCase" | "trim" => IRType::string(),
+            "contains" | "startsWith" | "endsWith" => IRType::boolean(),
+            _ => return Err(CodeGenError {
+                message: format!("Unknown String method: {}", method),
+            }),
+        };
+
+        let function_value = IRValue::function(
+            &format!("string.{}", method),
+            IRType::function(return_type.clone(), vec![], false),
+        );
+        let inst = IRInstruction::call(function_value, arg_values, Some(return_type.clone()));
+        let inst_id = inst.id();
+        entry_block.add_instruction(inst);
+
+        Ok(IRValue::Instruction {
+            id: inst_id,
+            ty: return_type,
+        })
     }
 
     fn generate_bytecode(&self) -> CodeGenResult<Vec<u8>> {

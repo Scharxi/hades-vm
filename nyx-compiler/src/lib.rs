@@ -10,10 +10,14 @@ pub mod module_parser;
 pub mod module_resolver;
 pub mod codegen;
 pub mod hex_compiler;
+pub mod semantic_analyzer;
 pub mod visibility_tests;
 pub mod nested_module_tests;
 pub mod class_tests;
 pub mod primitive_types_tests;
+
+#[cfg(test)]
+pub mod semantic_analysis_tests;
 
 /// Re-export commonly used types
 pub use lexer::{Lexer, Token};
@@ -22,6 +26,7 @@ pub use ast::*;
 pub use codegen::{CodeGenerator, CodeGenError};
 pub use hex_compiler::{HexCompiler, HexCompilerError, compile_source_to_hex_file};
 pub use module_resolver::{ModuleResolver, ResolvedModule, create_stdlib_resolver};
+pub use semantic_analyzer::{SemanticAnalyzer, SemanticError};
 
 /// Initialize the logger for the compiler
 pub fn init_logger() {
