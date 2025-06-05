@@ -25,7 +25,7 @@ pub fn create_test_function_type(context: Arc<Context>) -> Arc<Type> {
 
 /// Creates a test module with a given name
 pub fn create_test_module(context: Arc<Context>, name: &str) -> Module {
-    let mut module = Module::new(context, name.to_string());
+    let mut module = Module::new_root(context, name.to_string());
     module.set_source_file("test.rs".to_string());
     module
 }

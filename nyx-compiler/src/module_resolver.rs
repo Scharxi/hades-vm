@@ -10,9 +10,141 @@ use crate::parser::{Parser, ParseResult, ParseError};
 pub struct ResolvedModule {
     pub name: String,
     pub path: PathBuf,
+    pub module_path: ModulePath,
     pub functions: Vec<Function>,
     pub submodules: HashMap<String, ResolvedModule>,
     pub visibility: crate::ast::Visibility,
+    pub parent_path: Option<ModulePath>,
+}
+
+impl ResolvedModule {
+    /// Create a new resolved module
+    pub fn new(name: String, path: PathBuf, module_path: ModulePath, visibility: Visibility) -> Self {
+        Self {
+            name,
+            path,
+            module_path,
+            functions: Vec::new(),
+            submodules: HashMap::new(),
+            visibility,
+            parent_path: None,
+        }
+    }
+    
+    /// Add a submodule to this resolved module
+    pub fn add_submodule(&mut self, mut submodule: ResolvedModule) -> Result<(), String> {
+        if self.submodules.contains_key(&submodule.name) {
+            return Err(format!("Submodule {} already exists", submodule.name));
+        }
+        
+        // Set parent relationship
+        submodule.parent_path = Some(self.module_path.clone());
+        
+        // Update submodule path to be relative to this module
+        submodule.module_path = self.module_path.append(submodule.name.clone());
+        
+        self.submodules.insert(submodule.name.clone(), submodule);
+        Ok(())
+    }
+    
+    /// Find a submodule by path (recursive search)
+    pub fn find_module(&self, target_path: &ModulePath) -> Option<&ResolvedModule> {
+        // If this is the target, return self
+        if self.module_path == *target_path {
+            return Some(self);
+        }
+        
+        // Check if target is under this module's hierarchy
+        if target_path.is_child_of(&self.module_path) {
+            // Get the next segment in the path
+            if let Some(next_segment) = target_path.segments.get(self.module_path.segments.len()) {
+                if let Some(submodule) = self.submodules.get(next_segment) {
+                    return submodule.find_module(target_path);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Get all functions in this module and its accessible submodules
+    pub fn get_all_accessible_functions(&self, context_path: &ModulePath) -> Vec<&Function> {
+        let mut functions = Vec::new();
+        
+        // Add own functions
+        functions.extend(&self.functions);
+        
+        // Add functions from accessible submodules
+        for submodule in self.submodules.values() {
+            if submodule.is_accessible_from(context_path) {
+                functions.extend(submodule.get_all_accessible_functions(context_path));
+            }
+        }
+        
+        functions
+    }
+    
+    /// Check if this module is accessible from the given context
+    pub fn is_accessible_from(&self, context_path: &ModulePath) -> bool {
+        match &self.visibility {
+            Visibility::Public => true,
+            Visibility::Private => {
+                // Only accessible from the same module or parent
+                if let Some(parent) = &self.parent_path {
+                    context_path == parent || context_path == &self.module_path
+                } else {
+                    context_path == &self.module_path
+                }
+            }
+            Visibility::Internal => {
+                // Accessible within the same package/crate
+                let context_root = context_path.segments.first();
+                let self_root = self.module_path.segments.first();
+                context_root == self_root
+            }
+            Visibility::Protected => {
+                // Accessible from parent and all its descendants
+                if let Some(parent) = &self.parent_path {
+                    context_path == parent || parent.is_ancestor_of(context_path) || context_path == &self.module_path
+                } else {
+                    context_path == &self.module_path
+                }
+            }
+            Visibility::Package => {
+                // Accessible within the same package
+                let context_root = context_path.segments.first();
+                let self_root = self.module_path.segments.first();
+                context_root == self_root
+            }
+            Visibility::Restricted { restriction } => {
+                self.check_restricted_visibility(restriction, context_path)
+            }
+        }
+    }
+    
+    /// Check restricted visibility rules
+    fn check_restricted_visibility(&self, restriction: &VisibilityRestriction, context_path: &ModulePath) -> bool {
+        match restriction {
+            VisibilityRestriction::Crate => {
+                let context_root = context_path.segments.first();
+                let self_root = self.module_path.segments.first();
+                context_root == self_root
+            }
+            VisibilityRestriction::Super => {
+                // Check if context module is a child of this module's parent
+                if let Some(parent) = &self.parent_path {
+                    parent.is_parent_of(context_path)
+                } else {
+                    false
+                }
+            }
+            VisibilityRestriction::Module => context_path == &self.module_path,
+            VisibilityRestriction::Path(allowed_path) => {
+                // Check if context module matches the allowed path or is a descendant
+                *allowed_path == *context_path || allowed_path.is_ancestor_of(context_path)
+            }
+        }
+    }
 }
 
 /// Module resolver that can load modules from the file system
@@ -21,6 +153,8 @@ pub struct ModuleResolver {
     module_paths: Vec<PathBuf>,
     /// Cache of loaded modules
     module_cache: HashMap<String, ResolvedModule>,
+    /// Map of module paths to resolved modules for hierarchy tracking
+    path_cache: HashMap<ModulePath, ResolvedModule>,
 }
 
 /// Visibility checker for module access control
@@ -61,10 +195,17 @@ impl VisibilityChecker {
     }
 
     /// Check if the given module is in the same package/crate
-    fn is_same_package(&self, _module_path: &ModulePath) -> bool {
-        // For now, assume all modules are in the same package
-        // In a real implementation, this would check against package boundaries
-        true
+    fn is_same_package(&self, module_path: &ModulePath) -> bool {
+        // For single-segment modules, assume they're in the same package
+        // This handles common cases where modules don't have explicit package names
+        if self.current_module_path.segments.len() == 1 && module_path.segments.len() == 1 {
+            return true;
+        }
+        
+        // For multi-segment modules, compare the first segment (package/crate name)
+        let current_root = self.current_module_path.segments.first();
+        let target_root = module_path.segments.first();
+        current_root == target_root
     }
 
     /// Check if the given module is a submodule or the same module
@@ -114,6 +255,7 @@ impl ModuleResolver {
         Self {
             module_paths,
             module_cache: HashMap::new(),
+            path_cache: HashMap::new(),
         }
     }
     
@@ -154,12 +296,51 @@ impl ModuleResolver {
         None
     }
     
-    /// Load and parse a module from a file
+    /// Find all nested module files in a directory
+    pub fn find_nested_modules(&self, base_path: &Path) -> Vec<(String, PathBuf)> {
+        let mut modules = Vec::new();
+        
+        if let Ok(entries) = fs::read_dir(base_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+                
+                if path.is_dir() {
+                    // Check for mod.nyx or mod.ny in subdirectory
+                    for mod_file in &["mod.nyx", "mod.ny"] {
+                        let mod_path = path.join(mod_file);
+                        if mod_path.exists() {
+                            modules.push((name.clone(), mod_path));
+                            break;
+                        }
+                    }
+                } else if path.is_file() {
+                    // Check for .nyx or .ny files (but not mod.nyx/mod.ny which we already handle)
+                    if let Some(extension) = path.extension() {
+                        if (extension == "nyx" || extension == "ny") && !name.starts_with("mod.") {
+                            if let Some(stem) = path.file_stem() {
+                                modules.push((stem.to_string_lossy().to_string(), path));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        modules
+    }
+    
+    /// Load and parse a module from a file with nested module support
     pub fn load_module(&mut self, module_path: &ModulePath) -> ParseResult<ResolvedModule> {
         let path_string = module_path.to_string();
         
         // Check cache first
         if let Some(cached) = self.module_cache.get(&path_string) {
+            return Ok(cached.clone());
+        }
+        
+        // Check path cache
+        if let Some(cached) = self.path_cache.get(module_path) {
             return Ok(cached.clone());
         }
         
@@ -200,14 +381,43 @@ impl ModuleResolver {
             })?
             .clone();
         
-        let resolved_module = self.convert_to_resolved_module(
+        let mut resolved_module = self.convert_to_resolved_module(
             module_name,
-            file_path,
+            file_path.clone(),
+            module_path.clone(),
             program,
         )?;
         
+        // Load nested modules from the same directory
+        if let Some(parent_dir) = file_path.parent() {
+            let nested_modules = self.find_nested_modules(parent_dir);
+            
+            for (nested_name, nested_path) in nested_modules {
+                // Skip the current module file
+                if nested_path == file_path {
+                    continue;
+                }
+                
+                // Create module path for nested module
+                let nested_module_path = module_path.append(nested_name.clone());
+                
+                // Recursively load nested module
+                match self.load_module(&nested_module_path) {
+                    Ok(nested_module) => {
+                        if let Err(e) = resolved_module.add_submodule(nested_module) {
+                            eprintln!("Warning: Failed to add submodule {}: {}", nested_name, e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to load nested module {}: {}", nested_name, e);
+                    }
+                }
+            }
+        }
+        
         // Cache the result
         self.module_cache.insert(path_string, resolved_module.clone());
+        self.path_cache.insert(module_path.clone(), resolved_module.clone());
         
         Ok(resolved_module)
     }
@@ -217,23 +427,31 @@ impl ModuleResolver {
         &mut self,
         name: String,
         path: PathBuf,
+        module_path: ModulePath,
         program: ModuleAwareProgram,
     ) -> ParseResult<ResolvedModule> {
-        let mut submodules = HashMap::new();
+        let mut resolved_module = ResolvedModule::new(
+            name,
+            path.clone(),
+            module_path,
+            Visibility::Public, // File-based modules are typically public
+        );
         
-        // Process submodules
+        // Add functions to the module
+        resolved_module.functions = program.functions;
+        
+        // Process inline module declarations
         for module_decl in program.modules {
-            let submodule = self.convert_module_decl_to_resolved(module_decl, &path)?;
-            submodules.insert(submodule.name.clone(), submodule);
+            let submodule = self.convert_module_decl_to_resolved(module_decl, &path, &resolved_module.module_path)?;
+            if let Err(e) = resolved_module.add_submodule(submodule) {
+                return Err(ParseError {
+                    message: format!("Failed to add submodule: {}", e),
+                    position: 0,
+                });
+            }
         }
         
-        Ok(ResolvedModule {
-            name,
-            path,
-            functions: program.functions,
-            submodules,
-            visibility: crate::ast::Visibility::Public, // File-based modules are typically public
-        })
+        Ok(resolved_module)
     }
     
     /// Convert a module declaration to a resolved module
@@ -241,6 +459,7 @@ impl ModuleResolver {
         &mut self,
         module_decl: ModuleDecl,
         parent_path: &Path,
+        parent_module_path: &ModulePath,
     ) -> ParseResult<ResolvedModule> {
         let mut functions = Vec::new();
         
@@ -257,13 +476,17 @@ impl ModuleResolver {
             }
         }
         
-        Ok(ResolvedModule {
-            name: module_decl.name,
-            path: parent_path.to_path_buf(),
-            functions,
-            submodules: HashMap::new(), // Nested modules not supported yet
-            visibility: module_decl.visibility,
-        })
+        let submodule_path = parent_module_path.append(module_decl.name.clone());
+        let mut resolved_module = ResolvedModule::new(
+            module_decl.name,
+            parent_path.to_path_buf(),
+            submodule_path,
+            module_decl.visibility,
+        );
+        
+        resolved_module.functions = functions;
+        
+        Ok(resolved_module)
     }
     
     /// Get all available functions from a module path
@@ -303,9 +526,7 @@ impl ModuleResolver {
         package_root: &Path
     ) -> ParseResult<bool> {
         let module = self.load_module(module_path)?;
-        let checker = VisibilityChecker::new(current_context.clone(), package_root.to_path_buf());
-        
-        Ok(checker.is_accessible(&module.visibility, module_path))
+        Ok(module.is_accessible_from(current_context))
     }
 
     /// Get all visible modules from the current context
@@ -314,35 +535,78 @@ impl ModuleResolver {
         current_context: &ModulePath,
         package_root: &Path
     ) -> Vec<String> {
-        let checker = VisibilityChecker::new(current_context.clone(), package_root.to_path_buf());
         let mut visible_modules = Vec::new();
         
-        // Check all cached modules for visibility
-        for (module_name, module) in &self.module_cache {
-            let module_path = ModulePath::single(module.name.clone());
-            if checker.is_accessible(&module.visibility, &module_path) {
-                visible_modules.push(module_name.clone());
+        // Get all cached modules and check visibility
+        for (path, module) in &self.path_cache {
+            if module.is_accessible_from(current_context) {
+                visible_modules.push(path.to_string());
             }
         }
         
         visible_modules
     }
+    
+    /// Find a module in the loaded hierarchy
+    pub fn find_module(&self, target_path: &ModulePath) -> Option<&ResolvedModule> {
+        // Check path cache first
+        if let Some(module) = self.path_cache.get(target_path) {
+            return Some(module);
+        }
+        
+        // Search through loaded modules
+        for module in self.path_cache.values() {
+            if let Some(found) = module.find_module(target_path) {
+                return Some(found);
+            }
+        }
+        
+        None
+    }
+    
+    /// Get the full module hierarchy as a tree structure
+    pub fn get_module_tree(&self) -> HashMap<ModulePath, Vec<ModulePath>> {
+        let mut tree = HashMap::new();
+        
+        for (path, module) in &self.path_cache {
+            let mut children = Vec::new();
+            
+            for submodule in module.submodules.values() {
+                children.push(submodule.module_path.clone());
+            }
+            
+            tree.insert(path.clone(), children);
+        }
+        
+        tree
+    }
 }
 
-/// Standard library initialization
 pub fn create_stdlib_resolver() -> ModuleResolver {
     let mut resolver = ModuleResolver::new(vec![]);
     
-    // Add standard library path (this would be set up during installation)
-    if let Ok(stdlib_path) = std::env::var("NYX_STDLIB_PATH") {
-        resolver.add_module_path(PathBuf::from(stdlib_path));
+    // Add standard library paths
+    if let Ok(current_dir) = std::env::current_dir() {
+        let stdlib_path = current_dir.join("stdlib");
+        if stdlib_path.exists() {
+            resolver.add_module_path(stdlib_path);
+        }
     }
     
-    // Add local stdlib directory
-    resolver.add_module_path(PathBuf::from("stdlib"));
+    // Add common stdlib locations
+    let stdlib_paths = vec![
+        "/usr/local/lib/nyx/stdlib",
+        "/usr/lib/nyx/stdlib",
+        "./stdlib",
+        "../stdlib",
+    ];
     
-    // Add current directory for local modules
-    resolver.add_module_path(PathBuf::from("."));
+    for path_str in stdlib_paths {
+        let path = PathBuf::from(path_str);
+        if path.exists() {
+            resolver.add_module_path(path);
+        }
+    }
     
     resolver
 }

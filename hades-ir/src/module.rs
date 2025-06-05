@@ -144,37 +144,140 @@ impl fmt::Display for GlobalVariable {
     }
 }
 
-/// A module in the IR, representing a compilation unit.
+/// Module visibility levels for controlling access
+#[derive(Debug, Clone, PartialEq)]
+pub enum ModuleVisibility {
+    /// Publicly visible to all modules and external code
+    Public,
+    /// Only visible within the current package/crate
+    Internal,
+    /// Only visible within the parent module and its submodules
+    Protected,
+    /// Private to the defining module
+    Private,
+}
+
+/// A module path representing the hierarchical location of a module
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ModulePath {
+    /// The path segments (e.g., ["std", "collections", "vector"])
+    pub segments: Vec<String>,
+}
+
+impl ModulePath {
+    /// Create a new module path from segments
+    pub fn new(segments: Vec<String>) -> Self {
+        Self { segments }
+    }
+    
+    /// Create a root module path
+    pub fn root() -> Self {
+        Self { segments: vec![] }
+    }
+    
+    /// Create a single-segment module path
+    pub fn single(name: String) -> Self {
+        Self { segments: vec![name] }
+    }
+    
+    /// Append a segment to this path
+    pub fn append(&self, segment: String) -> Self {
+        let mut new_segments = self.segments.clone();
+        new_segments.push(segment);
+        Self { segments: new_segments }
+    }
+    
+    /// Get the parent path (all segments except the last)
+    pub fn parent(&self) -> Option<Self> {
+        if self.segments.is_empty() {
+            None
+        } else {
+            Some(Self { segments: self.segments[..self.segments.len() - 1].to_vec() })
+        }
+    }
+    
+    /// Get the module name (last segment)
+    pub fn name(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+    
+    /// Check if this path is a parent of the other path
+    pub fn is_parent_of(&self, other: &ModulePath) -> bool {
+        if self.segments.len() >= other.segments.len() {
+            return false;
+        }
+        
+        for (i, segment) in self.segments.iter().enumerate() {
+            if other.segments.get(i) != Some(segment) {
+                return false;
+            }
+        }
+        
+        true
+    }
+    
+    /// Check if this path is a child of the other path
+    pub fn is_child_of(&self, other: &ModulePath) -> bool {
+        other.is_parent_of(self)
+    }
+    
+    /// Check if this path is an ancestor of the other path
+    pub fn is_ancestor_of(&self, other: &ModulePath) -> bool {
+        self.is_parent_of(other) || self.segments == other.segments[..self.segments.len().min(other.segments.len())]
+    }
+}
+
+impl fmt::Display for ModulePath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.segments.join("::"))
+    }
+}
+
+/// A module in the IR, representing a compilation unit with hierarchical structure.
 #[derive(Debug, Clone)]
 pub struct Module {
     /// The context this module belongs to
     context: Arc<Context>,
-    /// The name of this module
-    name: String,
+    /// The hierarchical path of this module
+    path: ModulePath,
     /// The source file this module was compiled from, if any
     source_file: Option<String>,
     /// The functions in this module
     functions: HashMap<String, Function>,
     /// The global variables in this module
     global_variables: HashMap<String, GlobalVariable>,
+    /// Child submodules
+    submodules: HashMap<String, Module>,
+    /// Module visibility
+    visibility: ModuleVisibility,
     /// The target triple for this module
     target_triple: Option<String>,
     /// The data layout for this module
     data_layout: Option<String>,
+    /// Parent module reference (weak to avoid cycles)
+    parent_path: Option<ModulePath>,
 }
 
 impl Module {
-    /// Create a new module with the given name
-    pub fn new(context: Arc<Context>, name: String) -> Self {
+    /// Create a new module with the given path
+    pub fn new(context: Arc<Context>, path: ModulePath) -> Self {
         Self {
             context,
-            name,
+            path,
             source_file: None,
             functions: HashMap::new(),
             global_variables: HashMap::new(),
+            submodules: HashMap::new(),
+            visibility: ModuleVisibility::Public,
             target_triple: None,
             data_layout: None,
+            parent_path: None,
         }
+    }
+    
+    /// Create a new root module
+    pub fn new_root(context: Arc<Context>, name: String) -> Self {
+        Self::new(context, ModulePath::single(name))
     }
     
     /// Get the context this module belongs to
@@ -182,14 +285,34 @@ impl Module {
         self.context.clone()
     }
     
-    /// Get the name of this module
-    pub fn name(&self) -> &str {
-        &self.name
+    /// Get the full path of this module
+    pub fn path(&self) -> &ModulePath {
+        &self.path
     }
     
-    /// Set the name of this module
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
+    /// Get the name of this module (last segment of path)
+    pub fn name(&self) -> &str {
+        self.path.name().unwrap_or("root")
+    }
+    
+    /// Get the parent path of this module
+    pub fn parent_path(&self) -> Option<&ModulePath> {
+        self.parent_path.as_ref()
+    }
+    
+    /// Set the parent path of this module
+    pub fn set_parent_path(&mut self, parent: ModulePath) {
+        self.parent_path = Some(parent);
+    }
+    
+    /// Get the visibility of this module
+    pub fn visibility(&self) -> &ModuleVisibility {
+        &self.visibility
+    }
+    
+    /// Set the visibility of this module
+    pub fn set_visibility(&mut self, visibility: ModuleVisibility) {
+        self.visibility = visibility;
     }
     
     /// Get the source file this module was compiled from
@@ -238,7 +361,7 @@ impl Module {
         if self.functions.contains_key(&name) {
             return Err(Error::ConstructionError(format!(
                 "Function {} already exists in module {}",
-                name, self.name
+                name, self.path
             )));
         }
         
@@ -258,7 +381,7 @@ impl Module {
         if self.functions.contains_key(name) {
             return Err(Error::ConstructionError(format!(
                 "Function {} already exists in module {}",
-                name, self.name
+                name, self.path
             )));
         }
         
@@ -301,7 +424,7 @@ impl Module {
         if self.global_variables.contains_key(&name) {
             return Err(Error::ConstructionError(format!(
                 "Global variable {} already exists in module {}",
-                name, self.name
+                name, self.path
             )));
         }
         
@@ -323,7 +446,7 @@ impl Module {
         if self.global_variables.contains_key(name) {
             return Err(Error::ConstructionError(format!(
                 "Global variable {} already exists in module {}",
-                name, self.name
+                name, self.path
             )));
         }
         
@@ -354,6 +477,172 @@ impl Module {
         self.global_variables.get_mut(name)
     }
     
+    /// Get all submodules
+    pub fn submodules(&self) -> &HashMap<String, Module> {
+        &self.submodules
+    }
+    
+    /// Get mutable submodules
+    pub fn submodules_mut(&mut self) -> &mut HashMap<String, Module> {
+        &mut self.submodules
+    }
+    
+    /// Add a submodule to this module
+    pub fn add_submodule(&mut self, mut submodule: Module) -> Result<()> {
+        let name = submodule.name().to_string();
+        
+        if self.submodules.contains_key(&name) {
+            return Err(Error::ConstructionError(format!(
+                "Submodule {} already exists in module {}",
+                name, self.path
+            )));
+        }
+        
+        // Set parent relationship
+        submodule.set_parent_path(self.path.clone());
+        
+        // Update the submodule's path to be relative to this module
+        let new_path = self.path.append(name.clone());
+        submodule.path = new_path;
+        
+        self.submodules.insert(name, submodule);
+        Ok(())
+    }
+    
+    /// Create a new submodule
+    pub fn create_submodule(&mut self, name: &str, visibility: ModuleVisibility) -> Result<&mut Module> {
+        if self.submodules.contains_key(name) {
+            return Err(Error::ConstructionError(format!(
+                "Submodule {} already exists in module {}",
+                name, self.path
+            )));
+        }
+        
+        let submodule_path = self.path.append(name.to_string());
+        let mut submodule = Module::new(self.context.clone(), submodule_path);
+        submodule.set_visibility(visibility);
+        submodule.set_parent_path(self.path.clone());
+        
+        self.submodules.insert(name.to_string(), submodule);
+        Ok(self.submodules.get_mut(name).unwrap())
+    }
+    
+    /// Get a submodule by name
+    pub fn get_submodule(&self, name: &str) -> Option<&Module> {
+        self.submodules.get(name)
+    }
+    
+    /// Get a mutable submodule by name
+    pub fn get_submodule_mut(&mut self, name: &str) -> Option<&mut Module> {
+        self.submodules.get_mut(name)
+    }
+    
+    /// Find a module by path (recursive search through hierarchy)
+    pub fn find_module(&self, path: &ModulePath) -> Option<&Module> {
+        if path.segments.is_empty() {
+            return Some(self);
+        }
+        
+        // If this is the target path, return self
+        if self.path == *path {
+            return Some(self);
+        }
+        
+        // Check if path starts with our path
+        if path.segments.len() > self.path.segments.len() {
+            let mut matches = true;
+            for (i, segment) in self.path.segments.iter().enumerate() {
+                if path.segments.get(i) != Some(segment) {
+                    matches = false;
+                    break;
+                }
+            }
+            
+            if matches {
+                // This path is under our hierarchy, search submodules
+                let next_segment = &path.segments[self.path.segments.len()];
+                if let Some(submodule) = self.submodules.get(next_segment) {
+                    return submodule.find_module(path);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Find a mutable module by path
+    pub fn find_module_mut(&mut self, path: &ModulePath) -> Option<&mut Module> {
+        if path.segments.is_empty() {
+            return Some(self);
+        }
+        
+        // If this is the target path, return self
+        if self.path == *path {
+            return Some(self);
+        }
+        
+        // Check if path starts with our path
+        if path.segments.len() > self.path.segments.len() {
+            let mut matches = true;
+            for (i, segment) in self.path.segments.iter().enumerate() {
+                if path.segments.get(i) != Some(segment) {
+                    matches = false;
+                    break;
+                }
+            }
+            
+            if matches {
+                // This path is under our hierarchy, search submodules
+                let next_segment = &path.segments[self.path.segments.len()];
+                if let Some(submodule) = self.submodules.get_mut(next_segment) {
+                    return submodule.find_module_mut(path);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Get all modules in the hierarchy (depth-first traversal)
+    pub fn get_all_modules(&self) -> Vec<&Module> {
+        let mut modules = vec![self];
+        
+        for submodule in self.submodules.values() {
+            modules.extend(submodule.get_all_modules());
+        }
+        
+        modules
+    }
+    
+    /// Check if this module is accessible from the given context
+    pub fn is_accessible_from(&self, context_path: &ModulePath) -> bool {
+        match &self.visibility {
+            ModuleVisibility::Public => true,
+            ModuleVisibility::Private => {
+                // Only accessible from the same module or parent
+                if let Some(parent) = &self.parent_path {
+                    context_path == parent || context_path == &self.path
+                } else {
+                    context_path == &self.path
+                }
+            }
+            ModuleVisibility::Protected => {
+                // Accessible from parent and all its descendants
+                if let Some(parent) = &self.parent_path {
+                    context_path == parent || parent.is_ancestor_of(context_path) || context_path == &self.path
+                } else {
+                    context_path == &self.path
+                }
+            }
+            ModuleVisibility::Internal => {
+                // Accessible within the same top-level module/crate
+                let context_root = context_path.segments.first();
+                let self_root = self.path.segments.first();
+                context_root == self_root
+            }
+        }
+    }
+    
     /// Verify that the module is well-formed
     pub fn verify(&self) -> Result<()> {
         // Verify all functions
@@ -361,7 +650,17 @@ impl Module {
             function.verify().map_err(|e| {
                 Error::ValidationError(format!(
                     "Function {} in module {} failed verification: {}",
-                    name, self.name, e
+                    name, self.path, e
+                ))
+            })?;
+        }
+        
+        // Verify all submodules
+        for (name, submodule) in &self.submodules {
+            submodule.verify().map_err(|e| {
+                Error::ValidationError(format!(
+                    "Submodule {} in module {} failed verification: {}",
+                    name, self.path, e
                 ))
             })?;
         }
@@ -373,7 +672,7 @@ impl Module {
 impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Write module metadata
-        writeln!(f, "; Module: {}", self.name)?;
+        writeln!(f, "; Module: {}", self.path)?;
         
         if let Some(source_file) = &self.source_file {
             writeln!(f, "; Source file: {}", source_file)?;
@@ -400,6 +699,15 @@ impl fmt::Display for Module {
             writeln!(f)?;
             for function in self.functions.values() {
                 writeln!(f, "{}", function)?;
+            }
+        }
+        
+        // Write submodules
+        if !self.submodules.is_empty() {
+            writeln!(f)?;
+            writeln!(f, "; Submodules:")?;
+            for (name, submodule) in &self.submodules {
+                writeln!(f, "; - {}: {}", name, submodule.path)?;
             }
         }
         

@@ -62,6 +62,8 @@ pub enum Token {
     Bool,
     #[token("String")]
     String,
+    #[token("Void")]
+    Void,
 
     // Built-in functions for memory operations
     #[token("alloc")]
@@ -165,6 +167,7 @@ impl fmt::Display for Token {
             Token::Float => write!(f, "Float"),
             Token::Bool => write!(f, "Bool"),
             Token::String => write!(f, "String"),
+            Token::Void => write!(f, "Void"),
             Token::Alloc => write!(f, "alloc"),
             Token::Free => write!(f, "free"),
             Token::Load => write!(f, "load"),

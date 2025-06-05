@@ -103,6 +103,7 @@ pub enum Item {
     Enum(Enum),
     Trait(Trait),
     Implementation(Implementation),
+    Module(ModuleDecl),
 }
 
 /// A function with visibility modifier
@@ -211,6 +212,7 @@ pub enum Type {
     Float,
     Bool,
     String,
+    Void,
 }
 
 impl fmt::Display for Type {
@@ -220,6 +222,7 @@ impl fmt::Display for Type {
             Type::Float => write!(f, "Float"),
             Type::Bool => write!(f, "Bool"),
             Type::String => write!(f, "String"),
+            Type::Void => write!(f, "Void"),
         }
     }
 }
@@ -253,7 +256,7 @@ impl fmt::Display for UnaryOperator {
 }
 
 /// A module path for referencing items in other modules
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModulePath {
     pub segments: Vec<String>,
 }
@@ -265,6 +268,57 @@ impl ModulePath {
     
     pub fn single(name: String) -> Self {
         Self { segments: vec![name] }
+    }
+    
+    /// Create a root module path
+    pub fn root() -> Self {
+        Self { segments: vec![] }
+    }
+    
+    /// Append a segment to this path
+    pub fn append(&self, segment: String) -> Self {
+        let mut new_segments = self.segments.clone();
+        new_segments.push(segment);
+        Self { segments: new_segments }
+    }
+    
+    /// Get the parent path (all segments except the last)
+    pub fn parent(&self) -> Option<Self> {
+        if self.segments.is_empty() {
+            None
+        } else {
+            Some(Self { segments: self.segments[..self.segments.len() - 1].to_vec() })
+        }
+    }
+    
+    /// Get the module name (last segment)
+    pub fn name(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+    
+    /// Check if this path is a parent of the other path
+    pub fn is_parent_of(&self, other: &ModulePath) -> bool {
+        if self.segments.len() >= other.segments.len() {
+            return false;
+        }
+        
+        for (i, segment) in self.segments.iter().enumerate() {
+            if other.segments.get(i) != Some(segment) {
+                return false;
+            }
+        }
+        
+        true
+    }
+    
+    /// Check if this path is a child of the other path
+    pub fn is_child_of(&self, other: &ModulePath) -> bool {
+        other.is_parent_of(self)
+    }
+    
+    /// Check if this path is an ancestor of the other path
+    pub fn is_ancestor_of(&self, other: &ModulePath) -> bool {
+        self.is_parent_of(other) || self.segments == other.segments[..self.segments.len().min(other.segments.len())]
     }
 }
 

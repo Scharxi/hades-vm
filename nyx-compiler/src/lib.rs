@@ -11,6 +11,7 @@ pub mod module_resolver;
 pub mod codegen;
 pub mod hex_compiler;
 pub mod visibility_tests;
+pub mod nested_module_tests;
 
 /// Re-export commonly used types
 pub use lexer::{Lexer, Token};
