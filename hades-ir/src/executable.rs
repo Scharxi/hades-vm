@@ -1,11 +1,7 @@
 use std::collections::HashMap;
 use std::io::{Write, Read, Cursor};
 use byteorder::{LittleEndian, WriteBytesExt, ReadBytesExt};
-use crate::{
-    error::{Error, Result}, 
-    value::Value,
-    types::Type,
-};
+use crate::error::{Error, Result};
 
 /// Magic number identifying a Hades Executable file
 pub const HEX_MAGIC: u32 = 0x48455820; // "HEX " in ASCII

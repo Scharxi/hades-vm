@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use vm::opcode::Opcode;
 use crate::{
     error::{Error, Result},

@@ -6,7 +6,6 @@ use crate::{
     module::Module,
     function::Function,
     value::Value,
-    types::Type,
 };
 
 /// Generator for complete Hades Executable (HEX) files
