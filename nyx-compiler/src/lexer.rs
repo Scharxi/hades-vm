@@ -37,6 +37,22 @@ pub enum Token {
     #[token("as")]
     As,
 
+    // Visibility keywords
+    #[token("internal")]
+    Internal,
+    #[token("protected")]
+    Protected,
+    #[token("package")]
+    Package,
+    #[token("crate")]
+    Crate,
+    #[token("super")]
+    Super,
+    #[token("self")]
+    SelfKeyword,
+    #[token("in")]
+    In,
+
     // Types
     #[token("Int")]
     Int,
@@ -179,6 +195,13 @@ impl fmt::Display for Token {
             Token::FloatLiteral(value) => write!(f, "{}", value),
             Token::StringLiteral(value) => write!(f, "\"{}\"", value),
             Token::Error => write!(f, "ERROR"),
+            Token::Internal => write!(f, "internal"),
+            Token::Protected => write!(f, "protected"),
+            Token::Package => write!(f, "package"),
+            Token::Crate => write!(f, "crate"),
+            Token::Super => write!(f, "super"),
+            Token::SelfKeyword => write!(f, "self"),
+            Token::In => write!(f, "in"),
         }
     }
 }

@@ -1,0 +1,140 @@
+// Advanced Visibility Example for Nyx
+// Demonstrating internal, protected, package, and restricted visibility modifiers
+
+import std.io
+
+// Public module - visible everywhere
+pub mod utils {
+    // Public function - visible everywhere
+    pub fun public_function(): Int {
+        return 1
+    }
+    
+    // Internal function - visible within the current package/crate
+    internal fun internal_function(): Int {
+        return 2
+    }
+    
+    // Protected function - visible to this module and submodules
+    protected fun protected_function(): Int {
+        return 3
+    }
+    
+    // Package function - visible within package
+    package fun package_function(): Int {
+        return 4
+    }
+    
+    // Restricted visibility - visible only to crate
+    pub(crate) fun crate_visible(): Int {
+        return 5
+    }
+    
+    // Restricted visibility - visible to parent module
+    pub(super) fun super_visible(): Int {
+        return 6
+    }
+    
+    // Restricted visibility - visible to specific module path
+    pub(in core.math) fun math_only(): Int {
+        return 7
+    }
+}
+
+// Internal module - only visible within package
+internal mod core {
+    // Protected function within internal module
+    protected fun core_function(): Int {
+        return utils.internal_function() + 10
+    }
+    
+    pub mod math {
+        // Can access math_only function from utils
+        pub fun calculate(): Int {
+            return utils.math_only() * 2
+        }
+        
+        // Private function - only visible within this module
+        fun private_helper(): Int {
+            return 42
+        }
+    }
+}
+
+// Protected module - visible to current module and submodules
+protected mod helpers {
+    // Various visibility levels within protected module
+    pub fun public_helper(): Int {
+        return 100
+    }
+    
+    internal fun internal_helper(): Int {
+        return 200
+    }
+    
+    protected fun protected_helper(): Int {
+        return 300
+    }
+    
+    fun private_helper(): Int {
+        return 400
+    }
+}
+
+// Package module - visible within package
+package mod config {
+    // Configuration functions with different visibility
+    pub fun get_public_config(): Int {
+        return 1000
+    }
+    
+    internal fun get_internal_config(): Int {
+        return 2000
+    }
+    
+    package fun get_package_config(): Int {
+        return 3000
+    }
+}
+
+// Main function demonstrating access patterns
+pub fun main(): Int {
+    // Can access public functions
+    val public_result = utils.public_function()
+    
+    // Can access internal functions (same package)
+    val internal_result = utils.internal_function()
+    
+    // Can access protected functions (same module level)
+    val protected_result = utils.protected_function()
+    
+    // Can access package functions (same package)
+    val package_result = utils.package_function()
+    
+    // Can access crate-visible functions (same crate)
+    val crate_result = utils.crate_visible()
+    
+    // Can access helpers (protected module)
+    val helper_result = helpers.public_helper()
+    
+    // Can access package config
+    val config_result = config.get_public_config()
+    
+    return public_result + internal_result + protected_result + 
+           package_result + crate_result + helper_result + config_result
+}
+
+// Example of visibility errors (these would be caught by the compiler):
+/*
+// ERROR: Cannot access private function from outside module
+// val error1 = core.math.private_helper()
+
+// ERROR: Cannot access super-visible function from non-child module  
+// val error2 = utils.super_visible() // Only accessible from child modules
+
+// ERROR: Cannot access math_only from outside core.math module
+// val error3 = utils.math_only() // Only accessible from core.math
+
+// ERROR: Cannot access internal helper from outside package
+// From external package: val error4 = helpers.internal_helper()
+*/ 

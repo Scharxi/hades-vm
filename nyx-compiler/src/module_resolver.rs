@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{ModulePath, ModuleAwareProgram, Function, ModuleDecl};
+use crate::ast::{ModulePath, ModuleAwareProgram, Function, ModuleDecl, Visibility, VisibilityRestriction};
 use crate::parser::{Parser, ParseResult, ParseError};
 
 /// Represents a resolved module with its functions and submodules
@@ -12,7 +12,7 @@ pub struct ResolvedModule {
     pub path: PathBuf,
     pub functions: Vec<Function>,
     pub submodules: HashMap<String, ResolvedModule>,
-    pub is_public: bool,
+    pub visibility: crate::ast::Visibility,
 }
 
 /// Module resolver that can load modules from the file system
@@ -21,6 +21,91 @@ pub struct ModuleResolver {
     module_paths: Vec<PathBuf>,
     /// Cache of loaded modules
     module_cache: HashMap<String, ResolvedModule>,
+}
+
+/// Visibility checker for module access control
+#[derive(Debug)]
+pub struct VisibilityChecker {
+    /// Current module context for visibility checks
+    current_module_path: ModulePath,
+    /// Package/crate root path for package-level visibility
+    package_root: PathBuf,
+}
+
+impl VisibilityChecker {
+    /// Create a new visibility checker for the given module context
+    pub fn new(current_module_path: ModulePath, package_root: PathBuf) -> Self {
+        Self {
+            current_module_path,
+            package_root,
+        }
+    }
+
+    /// Check if an item with the given visibility is accessible from the current context
+    pub fn is_accessible(&self, item_visibility: &Visibility, item_module_path: &ModulePath) -> bool {
+        match item_visibility {
+            Visibility::Public => true,
+            Visibility::Private => self.is_same_module(item_module_path),
+            Visibility::Internal => self.is_same_package(item_module_path),
+            Visibility::Protected => self.is_submodule_or_same(item_module_path),
+            Visibility::Package => self.is_same_package(item_module_path),
+            Visibility::Restricted { restriction } => {
+                self.check_restricted_visibility(restriction, item_module_path)
+            }
+        }
+    }
+
+    /// Check if the given module is the same as the current module
+    fn is_same_module(&self, module_path: &ModulePath) -> bool {
+        self.current_module_path == *module_path
+    }
+
+    /// Check if the given module is in the same package/crate
+    fn is_same_package(&self, _module_path: &ModulePath) -> bool {
+        // For now, assume all modules are in the same package
+        // In a real implementation, this would check against package boundaries
+        true
+    }
+
+    /// Check if the given module is a submodule or the same module
+    fn is_submodule_or_same(&self, module_path: &ModulePath) -> bool {
+        // Check if the item's module is a parent or the same module
+        if self.current_module_path.segments.len() >= module_path.segments.len() {
+            for (i, segment) in module_path.segments.iter().enumerate() {
+                if self.current_module_path.segments.get(i) != Some(segment) {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check restricted visibility rules
+    fn check_restricted_visibility(&self, restriction: &VisibilityRestriction, item_module_path: &ModulePath) -> bool {
+        match restriction {
+            VisibilityRestriction::Crate => self.is_same_package(item_module_path),
+            VisibilityRestriction::Super => {
+                // Check if current module is a child of the item's module
+                if item_module_path.segments.len() + 1 == self.current_module_path.segments.len() {
+                    for (i, segment) in item_module_path.segments.iter().enumerate() {
+                        if self.current_module_path.segments.get(i) != Some(segment) {
+                            return false;
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            VisibilityRestriction::Module => self.is_same_module(item_module_path),
+            VisibilityRestriction::Path(allowed_path) => {
+                // Check if current module matches the allowed path
+                *allowed_path == self.current_module_path
+            }
+        }
+    }
 }
 
 impl ModuleResolver {
@@ -147,7 +232,7 @@ impl ModuleResolver {
             path,
             functions: program.functions,
             submodules,
-            is_public: true, // File-based modules are typically public
+            visibility: crate::ast::Visibility::Public, // File-based modules are typically public
         })
     }
     
@@ -177,7 +262,7 @@ impl ModuleResolver {
             path: parent_path.to_path_buf(),
             functions,
             submodules: HashMap::new(), // Nested modules not supported yet
-            is_public: matches!(module_decl.visibility, crate::ast::Visibility::Public),
+            visibility: module_decl.visibility,
         })
     }
     
@@ -190,6 +275,57 @@ impl ModuleResolver {
     /// Check if a module exists
     pub fn module_exists(&self, module_path: &ModulePath) -> bool {
         self.find_module_file(module_path).is_some()
+    }
+
+    /// Get all available functions from a module path with visibility checks
+    pub fn get_accessible_functions(
+        &mut self, 
+        module_path: &ModulePath,
+        current_context: &ModulePath,
+        package_root: &Path
+    ) -> ParseResult<Vec<Function>> {
+        let module = self.load_module(module_path)?;
+        let checker = VisibilityChecker::new(current_context.clone(), package_root.to_path_buf());
+        
+        // Filter functions based on visibility
+        let accessible_functions = module.functions.into_iter()
+            .filter(|function| checker.is_accessible(&function.visibility, module_path))
+            .collect();
+        
+        Ok(accessible_functions)
+    }
+
+    /// Check if a module is accessible from the current context
+    pub fn is_module_accessible(
+        &mut self,
+        module_path: &ModulePath,
+        current_context: &ModulePath,
+        package_root: &Path
+    ) -> ParseResult<bool> {
+        let module = self.load_module(module_path)?;
+        let checker = VisibilityChecker::new(current_context.clone(), package_root.to_path_buf());
+        
+        Ok(checker.is_accessible(&module.visibility, module_path))
+    }
+
+    /// Get all visible modules from the current context
+    pub fn get_visible_modules(
+        &mut self,
+        current_context: &ModulePath,
+        package_root: &Path
+    ) -> Vec<String> {
+        let checker = VisibilityChecker::new(current_context.clone(), package_root.to_path_buf());
+        let mut visible_modules = Vec::new();
+        
+        // Check all cached modules for visibility
+        for (module_name, module) in &self.module_cache {
+            let module_path = ModulePath::single(module.name.clone());
+            if checker.is_accessible(&module.visibility, &module_path) {
+                visible_modules.push(module_name.clone());
+            }
+        }
+        
+        visible_modules
     }
 }
 

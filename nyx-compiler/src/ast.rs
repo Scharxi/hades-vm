@@ -9,6 +9,7 @@ pub struct TypeParameter {
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub name: String,
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub fields: Vec<StructField>,
 }
@@ -16,6 +17,7 @@ pub struct Struct {
 #[derive(Debug, Clone)]
 pub struct StructField {
     pub name: String,
+    pub visibility: Visibility,
     pub type_: Type,
     pub is_mutable: bool,
 }
@@ -23,6 +25,7 @@ pub struct StructField {
 #[derive(Debug, Clone)]
 pub struct Enum {
     pub name: String,
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub variants: Vec<EnumVariant>,
 }
@@ -36,6 +39,7 @@ pub struct EnumVariant {
 #[derive(Debug, Clone)]
 pub struct Trait {
     pub name: String,
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub supertraits: Vec<Type>,
     pub items: Vec<TraitItem>,
@@ -72,6 +76,7 @@ pub struct TraitConst {
 
 #[derive(Debug, Clone)]
 pub struct Implementation {
+    pub visibility: Visibility,
     pub type_params: Vec<TypeParameter>,
     pub target_type: Type,
     pub trait_name: Option<Type>,
@@ -100,9 +105,11 @@ pub enum Item {
     Implementation(Implementation),
 }
 
+/// A function with visibility modifier
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
+    pub visibility: Visibility,
     pub parameters: Vec<Parameter>,
     pub return_type: Type,
     pub body: Block,
@@ -270,8 +277,61 @@ impl fmt::Display for ModulePath {
 /// Visibility modifier for items
 #[derive(Debug, Clone, PartialEq)]
 pub enum Visibility {
+    /// Publicly visible to all modules and external code
     Public,
+    /// Only visible within the current module
     Private,
+    /// Visible within the current package/crate, but not to external code
+    Internal,
+    /// Visible to the current module and all its submodules
+    Protected,
+    /// Visible within the package but with additional restrictions
+    Package,
+    /// Restricted visibility with custom path specification
+    Restricted {
+        /// The path that defines the scope of visibility
+        /// e.g., `pub(crate)`, `pub(super)`, `pub(in path::to::module)`
+        restriction: VisibilityRestriction,
+    },
+}
+
+/// Restrictions for visibility modifiers
+#[derive(Debug, Clone, PartialEq)]
+pub enum VisibilityRestriction {
+    /// Visible throughout the current crate
+    Crate,
+    /// Visible to the parent module
+    Super,
+    /// Visible to a specific module path
+    Path(ModulePath),
+    /// Visible only within the current module and its children
+    Module,
+}
+
+impl fmt::Display for Visibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Visibility::Public => write!(f, "pub"),
+            Visibility::Private => write!(f, ""),
+            Visibility::Internal => write!(f, "internal"),
+            Visibility::Protected => write!(f, "protected"),
+            Visibility::Package => write!(f, "package"),
+            Visibility::Restricted { restriction } => {
+                write!(f, "pub({})", restriction)
+            }
+        }
+    }
+}
+
+impl fmt::Display for VisibilityRestriction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VisibilityRestriction::Crate => write!(f, "crate"),
+            VisibilityRestriction::Super => write!(f, "super"),
+            VisibilityRestriction::Path(path) => write!(f, "in {}", path),
+            VisibilityRestriction::Module => write!(f, "self"),
+        }
+    }
 }
 
 /// An import statement

@@ -73,6 +73,13 @@ impl Parser {
     }
 
     pub fn parse_function(&mut self) -> ParseResult<Function> {
+        // Parse visibility first (could be at the start before 'fun')
+        let visibility = if matches!(self.peek(), Token::Pub | Token::Internal | Token::Protected | Token::Package) {
+            self.parse_visibility()?
+        } else {
+            Visibility::Private
+        };
+
         self.consume(Token::Fun, "Expected 'fun'")?;
         
         let name = self.consume_identifier("Expected function name")?;
@@ -106,6 +113,7 @@ impl Parser {
         
         Ok(Function {
             name,
+            visibility,
             parameters,
             return_type,
             body,
@@ -644,11 +652,56 @@ impl Parser {
     }
     
     /// Parse visibility modifier
-    pub fn parse_visibility(&mut self) -> Visibility {
-        if self.match_token(&Token::Pub) {
-            Visibility::Public
-        } else {
-            Visibility::Private
+    pub fn parse_visibility(&mut self) -> ParseResult<Visibility> {
+        match self.peek() {
+            Token::Pub => {
+                self.advance();
+                // Check for restricted visibility like pub(crate), pub(super), etc.
+                if self.match_token(&Token::LeftParen) {
+                    let restriction = self.parse_visibility_restriction()?;
+                    self.consume(Token::RightParen, "Expected ')' after visibility restriction")?;
+                    Ok(Visibility::Restricted { restriction })
+                } else {
+                    Ok(Visibility::Public)
+                }
+            }
+            Token::Internal => {
+                self.advance();
+                Ok(Visibility::Internal)
+            }
+            Token::Protected => {
+                self.advance();
+                Ok(Visibility::Protected)
+            }
+            Token::Package => {
+                self.advance();
+                Ok(Visibility::Package)
+            }
+            _ => Ok(Visibility::Private)
+        }
+    }
+
+    /// Parse visibility restriction for pub(restriction) syntax
+    fn parse_visibility_restriction(&mut self) -> ParseResult<VisibilityRestriction> {
+        match self.peek() {
+            Token::Crate => {
+                self.advance();
+                Ok(VisibilityRestriction::Crate)
+            }
+            Token::Super => {
+                self.advance();
+                Ok(VisibilityRestriction::Super)
+            }
+            Token::SelfKeyword => {
+                self.advance();
+                Ok(VisibilityRestriction::Module)
+            }
+            Token::In => {
+                self.advance();
+                let path = self.parse_module_path()?;
+                Ok(VisibilityRestriction::Path(path))
+            }
+            _ => Err(self.error("Expected 'crate', 'super', 'self', or 'in' after 'pub('"))
         }
     }
     
@@ -656,7 +709,7 @@ impl Parser {
     /// Syntax: mod mymodule { ... }
     /// Syntax: pub mod mymodule { ... }
     pub fn parse_module_declaration(&mut self) -> ParseResult<ModuleDecl> {
-        let visibility = self.parse_visibility();
+        let visibility = self.parse_visibility()?;
         
         self.consume(Token::Mod, "Expected 'mod'")?;
         let name = self.consume_identifier("Expected module name")?;
@@ -665,22 +718,15 @@ impl Parser {
         
         let mut items = Vec::new();
         while !self.check(&Token::RightBrace) && !self.is_at_end() {
-            // For now, only support functions in modules
-            // Later we can extend this to support structs, etc.
-            if self.check(&Token::Fun) {
-                let function = self.parse_function()?;
-                items.push(Item::Function(function));
-            } else if self.check(&Token::Pub) {
-                // Skip the pub token for now - we'll add proper visibility support later
-                self.advance();
-                if self.check(&Token::Fun) {
+            // Parse items with their own visibility modifiers
+            match self.peek() {
+                Token::Fun | Token::Pub | Token::Internal | Token::Protected | Token::Package => {
                     let function = self.parse_function()?;
                     items.push(Item::Function(function));
-                } else {
-                    return Err(self.error("Expected 'fun' after 'pub'"));
                 }
-            } else {
-                return Err(self.error("Only functions are currently supported in modules"));
+                _ => {
+                    return Err(self.error("Only functions are currently supported in modules"));
+                }
             }
         }
         
