@@ -71,6 +71,16 @@ impl HexLoader {
         
         self.validate_executable(&executable)?;
         self.entry_point = Some(executable.header.entry_point as usize);
+        
+        // Populate section addresses
+        for section in &executable.sections {
+            let virtual_address = section.header.virtual_address as usize;
+            self.section_addresses.insert(
+                format!("section_{}", section.header.section_type as u16),
+                virtual_address
+            );
+        }
+        
         self.executable = Some(executable);
         
         Ok(())
@@ -82,6 +92,16 @@ impl HexLoader {
         
         self.validate_executable(&executable)?;
         self.entry_point = Some(executable.header.entry_point as usize);
+        
+        // Populate section addresses
+        for section in &executable.sections {
+            let virtual_address = section.header.virtual_address as usize;
+            self.section_addresses.insert(
+                format!("section_{}", section.header.section_type as u16),
+                virtual_address
+            );
+        }
+        
         self.executable = Some(executable);
         
         Ok(())
