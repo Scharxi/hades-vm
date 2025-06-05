@@ -1,0 +1,31 @@
+// Geometry submodule of math
+// This file represents math::geometry module
+
+// Public geometry functions
+pub fun area_rectangle(width: Int, height: Int): Int {
+    // Use parent module's protected function
+    return super::multiply_helper(width, height)
+}
+
+pub fun area_square(side: Int): Int {
+    return area_rectangle(side, side)
+}
+
+pub fun perimeter_rectangle(width: Int, height: Int): Int {
+    let width_doubled = super::multiply_helper(width, 2)
+    let height_doubled = super::multiply_helper(height, 2)
+    return super::add(width_doubled, height_doubled)
+}
+
+// Protected function for use by child modules
+protected fun calculate_hypotenuse(a: Int, b: Int): Float {
+    // Simplified - in reality would use sqrt
+    let a_squared = super::multiply_helper(a, a)
+    let b_squared = super::multiply_helper(b, b)
+    return 0.0  // Placeholder
+}
+
+// Internal function
+internal fun geometry_internal(): Int {
+    return 42
+} 

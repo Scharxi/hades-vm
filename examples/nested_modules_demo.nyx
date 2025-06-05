@@ -1,0 +1,160 @@
+// Nested Modules Demo for Hades VM
+// This demonstrates the nested module system with various visibility levels
+
+import std::io
+import std::collections
+
+// Top-level public module
+pub mod math {
+    // Public function in math module
+    pub fun add(a: Int, b: Int): Int {
+        return a + b
+    }
+    
+    // Internal function (only accessible within the same crate)
+    internal fun multiply_internal(a: Int, b: Int): Int {
+        return a * b
+    }
+    
+    // Nested public submodule
+    pub mod geometry {
+        // Public function in geometry submodule
+        pub fun area_rectangle(width: Int, height: Int): Int {
+            // Use parent module function
+            return super::multiply_internal(width, height)
+        }
+        
+        // Protected function (accessible to parent and children)
+        protected fun calculate_diagonal(width: Int, height: Int): Float {
+            let width_squared = super::multiply_internal(width, width)
+            let height_squared = super::multiply_internal(height, height)
+            // Note: In a real implementation, this would use sqrt
+            return 0.0
+        }
+        
+        // Nested private submodule
+        mod internal_calculations {
+            // Private function (only accessible within this module)
+            fun helper_function(): Int {
+                return 42
+            }
+            
+            // Package-level function
+            package fun package_helper(): Int {
+                return helper_function()
+            }
+        }
+        
+        // Another nested submodule with restricted visibility
+        pub(crate) mod advanced {
+            pub fun complex_calculation(): Int {
+                // Access package-level function from sibling module
+                return super::internal_calculations::package_helper()
+            }
+        }
+    }
+    
+    // Another top-level submodule in math
+    pub mod statistics {
+        pub fun average(values: [Int]): Float {
+            // Note: Array syntax is conceptual here
+            return 0.0
+        }
+        
+        // Protected function accessible to parent and children
+        protected fun sum(values: [Int]): Int {
+            return 0
+        }
+        
+        // Internal module with specific path visibility
+        pub(in math) mod internal_stats {
+            pub fun variance(): Float {
+                return 0.0
+            }
+        }
+    }
+}
+
+// Another top-level module
+internal mod utils {
+    pub fun format_number(num: Int): String {
+        return "42"
+    }
+    
+    // Nested utility modules
+    pub mod string_utils {
+        pub fun trim(s: String): String {
+            return s
+        }
+        
+        pub fun uppercase(s: String): String {
+            return s
+        }
+    }
+    
+    pub mod array_utils {
+        pub fun length(arr: [Int]): Int {
+            return 0
+        }
+        
+        pub fun is_empty(arr: [Int]): Bool {
+            return true
+        }
+    }
+}
+
+// Private module (only accessible within this file)
+mod private_internals {
+    fun secret_function(): Int {
+        return 123
+    }
+    
+    mod deeply_nested {
+        mod even_deeper {
+            fun ultra_private(): Bool {
+                return false
+            }
+        }
+    }
+}
+
+// Main function demonstrating module usage
+fun main(): Int {
+    // Use functions from nested modules
+    let result1 = math::add(10, 20)
+    let result2 = math::geometry::area_rectangle(5, 4)
+    
+    // Use functions with different access patterns
+    let formatted = utils::format_number(result1)
+    let trimmed = utils::string_utils::trim("  hello  ")
+    
+    // Advanced calculations from deeply nested module
+    let complex_result = math::geometry::advanced::complex_calculation()
+    
+    // Statistical operations
+    let avg = math::statistics::average([1, 2, 3, 4, 5])
+    
+    return result1 + result2
+}
+
+// Example of module re-exports and aliases
+pub mod exports {
+    // Re-export specific functions from nested modules
+    pub use math::add
+    pub use math::geometry::area_rectangle as area
+    
+    // Re-export entire submodules
+    pub use utils::string_utils
+    
+    // Create module aliases
+    pub mod geo = math::geometry
+}
+
+// Example function using re-exported items
+fun test_exports(): Int {
+    let sum = exports::add(5, 3)
+    let area = exports::area(10, 20)
+    let text = exports::string_utils::trim("  test  ")
+    
+    return sum + area
+} 
